@@ -27,7 +27,7 @@ Expected files:
 - `path-policy.yaml`
 - `gate-report.yaml`
 
-All evidence files should include:
+All evidence files must include:
 
 ```yaml
 schema_version: 1
@@ -68,8 +68,12 @@ Rules:
 
 - Missing path-policy evidence means `inconclusive`.
 - Empty path-policy evidence means `inconclusive`.
+- Missing path-policy source means `inconclusive`.
+- Path-policy evidence must identify whether it came from `worktree` or a `git_range`.
+- Empty `base == head` git-range evidence does not prove dirty worktree path safety.
 - Only explicit `result: pass` satisfies the path-policy gate.
 - `result: fail`, `result: failed`, or forbidden path violations mean `failed`.
+- A passing path-policy result must be self-consistent with `changed_files` and `reasons`.
 
 ## Reviewer Evidence
 
