@@ -11,6 +11,7 @@ tools/agent-bridge/agent-bridge validate docs/milestones/M1.md
 tools/agent-bridge/agent-bridge diff-check --task M1-T04 --worktree
 tools/agent-bridge/agent-bridge gate --task M1-T08
 tools/agent-bridge/agent-bridge closeout --task M1-T08
+tools/agent-bridge/agent-bridge closeout --milestone-name M1 --dry-run --json
 tools/agent-bridge/agent-bridge closeout --milestone-name M1
 ```
 

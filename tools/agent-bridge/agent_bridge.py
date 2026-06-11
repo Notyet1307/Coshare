@@ -53,6 +53,7 @@ ENUMS = {
 }
 
 EVIDENCE_VALUES = {"required", "not_applicable"}
+FUNCTIONAL_TEST_LEVELS = {"FT-L0", "FT-L1", "FT-L2", "FT-L3", "FT-L4"}
 GATE_ACCEPTED = "accepted"
 GATE_FAILED = "failed"
 GATE_INCONCLUSIVE = "inconclusive"
@@ -225,6 +226,22 @@ def changed_paths(base: str | None, head: str | None, worktree: bool) -> list[st
     raise BridgeError("Provide --worktree or both --base and --head.")
 
 
+def changed_paths_from_source(source: dict[str, Any]) -> tuple[list[str] | None, dict[str, Any] | None]:
+    mode = source.get("mode")
+    try:
+        if mode == "worktree":
+            return changed_paths(None, None, True), None
+        if mode == "git_range":
+            base = source.get("base")
+            head = source.get("head")
+            if not base or not head:
+                return None, {"code": "invalid_path_policy_source", "message": "git_range source requires base and head."}
+            return changed_paths(str(base), str(head), False), None
+    except BridgeError as exc:
+        return None, {"code": "path_policy_source_unavailable", "message": str(exc)}
+    return None, {"code": "invalid_path_policy_source", "message": "source.mode must be worktree or git_range."}
+
+
 def diff_check_payload(task: dict[str, Any], paths: list[str]) -> dict[str, Any]:
     allowed = task.get("allowed_paths", [])
     forbidden = task.get("forbidden_paths", [])
@@ -252,6 +269,19 @@ def read_yaml(path: Path) -> tuple[dict[str, Any] | None, dict[str, Any] | None]
     return data, None
 
 
+def read_evidence(task_id: str, filename: str) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    path = evidence_dir(task_id) / filename
+    data, error = read_yaml(path)
+    if error:
+        return None, error
+    assert data is not None
+    if data.get("schema_version") != 1:
+        return None, {"code": "invalid_evidence_schema_version", "path": rel(path), "message": "Evidence schema_version must be 1."}
+    if data.get("task_id") != task_id:
+        return None, {"code": "evidence_task_id_mismatch", "path": rel(path), "message": f"Evidence task_id must be {task_id}."}
+    return data, None
+
+
 def evidence_dir(task_id: str) -> Path:
     return EVIDENCE_ROOT / task_id
 
@@ -260,7 +290,7 @@ def check_verifier(task: dict[str, Any]) -> tuple[str, list[dict[str, Any]]]:
     task_id = task["task_id"]
     if task.get("required_evidence", {}).get("verifier") == "not_applicable":
         return "pass", []
-    data, error = read_yaml(evidence_dir(task_id) / "verifier.yaml")
+    data, error = read_evidence(task_id, "verifier.yaml")
     if error:
         return GATE_INCONCLUSIVE, [error]
     verifier = data.get("verifier", data)
@@ -288,7 +318,7 @@ def check_reviewer(task: dict[str, Any]) -> tuple[str, list[dict[str, Any]]]:
     task_id = task["task_id"]
     if task.get("required_evidence", {}).get("reviewer") == "not_applicable":
         return "pass", []
-    data, error = read_yaml(evidence_dir(task_id) / "reviewer.yaml")
+    data, error = read_evidence(task_id, "reviewer.yaml")
     if error:
         return GATE_INCONCLUSIVE, [error]
     reviewer = data.get("reviewer")
@@ -304,6 +334,8 @@ def check_reviewer(task: dict[str, Any]) -> tuple[str, list[dict[str, Any]]]:
         if not isinstance(finding, dict):
             return GATE_INCONCLUSIVE, [{"code": "invalid_reviewer_finding", "message": "Each reviewer finding must be a mapping."}]
         severity = str(finding.get("severity", "")).upper()
+        if severity in {"P0", "P1"} and "status" not in finding:
+            return GATE_INCONCLUSIVE, [{"code": "missing_reviewer_finding_status", "message": "P0/P1 reviewer findings must include status."}]
         status = str(finding.get("status", "open")).lower()
         if severity in {"P0", "P1"} and status not in {"resolved", "closed", "waived"}:
             return GATE_FAILED, [{"code": "open_blocking_reviewer_finding", "message": "Open P0/P1 reviewer finding blocks acceptance.", "finding": finding}]
@@ -318,10 +350,13 @@ def check_functional(task: dict[str, Any]) -> tuple[str, list[dict[str, Any]]]:
     task_id = task["task_id"]
     if task.get("required_evidence", {}).get("functional_test") == "not_applicable":
         return "pass", []
-    data, error = read_yaml(evidence_dir(task_id) / "functional-test.yaml")
+    data, error = read_evidence(task_id, "functional-test.yaml")
     if error:
         return GATE_INCONCLUSIVE, [error]
     ft = data.get("functional_test", data)
+    level = ft.get("level")
+    if level is not None and level not in FUNCTIONAL_TEST_LEVELS:
+        return GATE_INCONCLUSIVE, [{"code": "invalid_functional_test_level", "message": "functional_test.level must be FT-L0, FT-L1, FT-L2, FT-L3, or FT-L4."}]
     if ft.get("conclusion") in {"fail", "failed"}:
         return GATE_FAILED, [{"code": "functional_test_failed", "message": "Functional test failed."}]
     if ft.get("conclusion") != "pass":
@@ -330,28 +365,59 @@ def check_functional(task: dict[str, Any]) -> tuple[str, list[dict[str, Any]]]:
 
 
 def check_path_policy(task: dict[str, Any]) -> tuple[str, list[dict[str, Any]]]:
-    data, error = read_yaml(evidence_dir(task["task_id"]) / "path-policy.yaml")
+    data, error = read_evidence(task["task_id"], "path-policy.yaml")
     if error:
-        error["code"] = "missing_path_policy"
-        error["message"] = "path-policy.yaml is required before gate acceptance."
+        if error.get("code") == "missing_evidence":
+            error["code"] = "missing_path_policy"
+            error["message"] = "path-policy.yaml is required before gate acceptance."
         return GATE_INCONCLUSIVE, [error]
     result = data.get("result") or data.get("path_policy", {}).get("result")
-    if result in {"fail", GATE_FAILED}:
-        return GATE_FAILED, data.get("reasons", [{"code": "path_policy_failed", "message": "Path policy failed."}])
-    if result == GATE_INCONCLUSIVE:
-        return GATE_INCONCLUSIVE, data.get("reasons", [{"code": "path_policy_inconclusive", "message": "Path policy is inconclusive."}])
-    if result != "pass":
+    source = data.get("source")
+    if not isinstance(source, dict) or source.get("mode") not in {"worktree", "git_range"}:
+        return GATE_INCONCLUSIVE, [{"code": "missing_path_policy_source", "message": "path-policy.yaml must include source.mode as worktree or git_range."}]
+    reasons = data.get("reasons", [])
+    if not isinstance(reasons, list):
+        return GATE_INCONCLUSIVE, [{"code": "invalid_path_policy_reasons", "message": "path-policy.reasons must be a list."}]
+    changed_files = data.get("changed_files", [])
+    if not isinstance(changed_files, list):
+        return GATE_INCONCLUSIVE, [{"code": "invalid_path_policy_changed_files", "message": "path-policy.changed_files must be a list."}]
+    blocking_reason_codes = {"forbidden_path_changed", "outside_allowed_paths"}
+    blocking_reasons = [reason for reason in reasons if isinstance(reason, dict) and reason.get("code") in blocking_reason_codes]
+    if blocking_reasons:
+        return GATE_FAILED, blocking_reasons
+    recomputed = diff_check_payload(task, [str(path) for path in changed_files])
+    if recomputed["result"] == "fail":
+        return GATE_FAILED, recomputed["reasons"]
+    if result == "pass" and reasons:
+        return GATE_INCONCLUSIVE, [{"code": "path_policy_pass_has_reasons", "message": "Passing path-policy evidence must not include violation reasons."}]
+    if result != "pass" and result not in {"fail", GATE_FAILED, GATE_INCONCLUSIVE}:
         return GATE_INCONCLUSIVE, [{"code": "invalid_path_policy_result", "message": "path-policy.yaml must include result: pass, fail, failed, or inconclusive."}]
+    source_paths, source_error = changed_paths_from_source(source)
+    if source_error:
+        return GATE_INCONCLUSIVE, [source_error]
+    if sorted(set(str(path) for path in changed_files)) != sorted(set(source_paths or [])):
+        return GATE_INCONCLUSIVE, [{"code": "path_policy_changed_files_mismatch", "message": "path-policy.changed_files must match the files changed by its source."}]
+    if source.get("mode") == "git_range" and source.get("base") == source.get("head") and changed_files == []:
+        return GATE_INCONCLUSIVE, [{"code": "empty_git_range_path_policy", "message": "Empty base/head path-policy evidence does not prove dirty worktree path safety."}]
+    if result in {"fail", GATE_FAILED}:
+        return GATE_FAILED, reasons or [{"code": "path_policy_failed", "message": "Path policy failed."}]
+    if result == GATE_INCONCLUSIVE:
+        return GATE_INCONCLUSIVE, reasons or [{"code": "path_policy_inconclusive", "message": "Path policy is inconclusive."}]
     return "pass", []
 
 
 def check_blockers(task: dict[str, Any]) -> tuple[str, list[dict[str, Any]]]:
-    data, error = read_yaml(evidence_dir(task["task_id"]) / "blockers.yaml")
+    data, error = read_evidence(task["task_id"], "blockers.yaml")
     if error:
         return "pass", []
     blockers = data.get("blockers", [])
     if not isinstance(blockers, list):
         return GATE_INCONCLUSIVE, [{"code": "invalid_blockers", "message": "blockers must be a list."}]
+    for blocker in blockers:
+        if not isinstance(blocker, dict):
+            return GATE_INCONCLUSIVE, [{"code": "invalid_blocker", "message": "Each blocker must be a mapping."}]
+        if "severity" not in blocker or "status" not in blocker:
+            return GATE_INCONCLUSIVE, [{"code": "invalid_blocker_schema", "message": "Each blocker must include severity and status."}]
     open_blockers = [b for b in blockers if str(b.get("status", "open")).lower() not in {"resolved", "closed"}]
     if open_blockers:
         return GATE_FAILED, [{"code": "open_blocker", "message": "Open blocker exists.", "blocker": open_blockers[0]}]
@@ -398,6 +464,11 @@ def command_diff_check(args: argparse.Namespace) -> int:
     try:
         paths = changed_paths(args.base, args.head, args.worktree)
         payload = diff_check_payload(task, paths)
+        payload["source"] = (
+            {"mode": "worktree"}
+            if args.worktree
+            else {"mode": "git_range", "base": args.base, "head": args.head}
+        )
     except BridgeError as exc:
         payload = {"result": GATE_INCONCLUSIVE, "task_id": args.task, "reasons": [{"code": "git_state_unavailable", "message": str(exc)}]}
     if args.write_evidence:
@@ -419,10 +490,70 @@ def command_gate(args: argparse.Namespace) -> int:
     return emit(payload, args.json)
 
 
-def closeout_block(task_id: str, gate: dict[str, Any]) -> str:
+def summarize_evidence(task: dict[str, Any]) -> tuple[list[str], list[str]]:
+    task_id = task["task_id"]
+    directory = evidence_dir(task_id)
+    evidence_lines: list[str] = []
+    changed_files: list[str] = []
+    required = task.get("required_evidence", {})
+    evidence_files = [
+        ("path-policy.yaml", "result", None),
+        ("verifier.yaml", "verifier.conclusion", "verifier"),
+        ("reviewer.yaml", "reviewer.conclusion", "reviewer"),
+        ("functional-test.yaml", "functional_test.conclusion", "functional_test"),
+        ("blockers.yaml", "blockers", None),
+        ("gate-report.yaml", "result", None),
+    ]
+    for filename, key, requirement_key in evidence_files:
+        path = directory / filename
+        if filename == "path-policy.yaml":
+            check_result, check_reasons = check_path_policy(task)
+            reason_codes = ",".join(reason.get("code", "reason") for reason in check_reasons)
+            suffix = f" ({reason_codes})" if reason_codes else ""
+            evidence_lines.append(f"- {filename}: {check_result}{suffix}")
+            data, _ = read_yaml(path)
+            if data:
+                changed = data.get("changed_files", [])
+                if isinstance(changed, list):
+                    changed_files = [str(item) for item in changed]
+            continue
+        data, error = read_evidence(task_id, filename)
+        if error:
+            if requirement_key and required.get(requirement_key) == "not_applicable":
+                evidence_lines.append(f"- {filename}: not_applicable")
+            else:
+                evidence_lines.append(f"- {filename}: {error.get('code', 'invalid')}")
+            continue
+        value: Any = None
+        if key == "verifier.conclusion":
+            value = data.get("verifier", {}).get("conclusion")
+        elif key == "reviewer.conclusion":
+            value = data.get("reviewer", {}).get("conclusion")
+        elif key == "functional_test.conclusion":
+            value = data.get("functional_test", {}).get("conclusion")
+        elif key == "blockers":
+            blockers = data.get("blockers", [])
+            value = f"{len(blockers)} recorded" if isinstance(blockers, list) else "invalid"
+        else:
+            value = data.get(key)
+        evidence_lines.append(f"- {filename}: {value if value is not None else 'present'}")
+        if filename == "path-policy.yaml":
+            changed = data.get("changed_files", [])
+            if isinstance(changed, list):
+                changed_files = [str(item) for item in changed]
+    return evidence_lines, changed_files
+
+
+def closeout_block(task: dict[str, Any], gate: dict[str, Any]) -> str:
+    task_id = task["task_id"]
     status = gate["result"]
     reasons = gate.get("reasons", [])
     reason_lines = "\n".join(f"- {r.get('code')}: {r.get('message', '')}" for r in reasons) or "- none"
+    evidence_lines, changed_files = summarize_evidence(task)
+    changed_file_lines = "\n".join(f"- {path}" for path in changed_files) or "- none"
+    evidence_summary = "\n".join(evidence_lines) or "- none"
+    risk_lines = "- none" if status == GATE_ACCEPTED else reason_lines
+    followup_lines = "- none" if status == GATE_ACCEPTED else "- resolve gate reasons and rerun agent-bridge gate"
     return f"""<!-- agent-bridge:closeout:start {task_id} -->
 ### {task_id}
 
@@ -437,6 +568,22 @@ Gate checks:
 Reasons:
 
 {reason_lines}
+
+Changed files:
+
+{changed_file_lines}
+
+Evidence summary:
+
+{evidence_summary}
+
+Known risks:
+
+{risk_lines}
+
+Followups:
+
+{followup_lines}
 <!-- agent-bridge:closeout:end {task_id} -->
 """
 
@@ -466,10 +613,11 @@ def command_closeout(args: argparse.Namespace) -> int:
     results = []
     for task in selected:
         gate = gate_payload(task)
-        text = upsert_block(text, task["task_id"], closeout_block(task["task_id"], gate))
+        text = upsert_block(text, task["task_id"], closeout_block(task, gate))
         results.append({"task_id": task["task_id"], "result": gate["result"]})
-    path.write_text(text, encoding="utf-8")
-    payload = {"result": "pass", "closeout": rel(path), "tasks": results, "reasons": []}
+    if not args.dry_run:
+        path.write_text(text, encoding="utf-8")
+    payload = {"result": "pass", "closeout": rel(path), "dry_run": args.dry_run, "tasks": results, "reasons": []}
     return emit(payload, args.json)
 
 
@@ -503,6 +651,7 @@ def build_parser() -> argparse.ArgumentParser:
     closeout.add_argument("--task")
     closeout.add_argument("--milestone", default=str(DEFAULT_MILESTONE))
     closeout.add_argument("--milestone-name", default="M1")
+    closeout.add_argument("--dry-run", action="store_true")
     closeout.add_argument("--json", action="store_true")
     closeout.set_defaults(func=command_closeout)
 
