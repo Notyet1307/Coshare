@@ -1,0 +1,18 @@
+schema_version: 1
+task_id: M1-T09
+verifier:
+  branch: main
+  environment:
+    os: macOS
+    runtime: Python 3
+    package_manager: none
+  commands:
+    - command: "python3 -m unittest discover tools/agent-bridge/tests"
+      exit_code: 0
+      stdout_excerpt: "Ran 25 tests ... OK"
+      stderr_excerpt: ""
+    - command: "tools/agent-bridge/agent-bridge closeout --milestone-name M1 --json"
+      exit_code: 0
+      stdout_excerpt: "\"result\": \"pass\"; closeout docs/milestones/closeout/M1.md"
+      stderr_excerpt: ""
+  conclusion: pass

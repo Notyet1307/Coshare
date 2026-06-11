@@ -1,0 +1,15 @@
+schema_version: 1
+task_id: M1-T10
+reviewer:
+  reviewer_id: codex-local-review
+  reviewed_at: "2026-06-11"
+  scope:
+    - tools/agent-bridge/tests/test_agent_bridge.py
+    - tools/agent-bridge/tests/fixtures/valid_milestone.md
+    - tools/agent-bridge/tests/fixtures/invalid_missing.md
+    - tools/agent-bridge/tests/fixtures/invalid_duplicate.md
+    - tools/agent-bridge/README.md
+  findings: []
+  conclusion: pass
+  notes:
+    - Tests cover valid/invalid milestone fixtures, diff-check pass/fail paths, verifier failure, reviewer P1 failure, missing evidence, evidence schema failures, and closeout idempotency.

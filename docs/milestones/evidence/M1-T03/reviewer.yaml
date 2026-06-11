@@ -1,0 +1,11 @@
+schema_version: 1
+task_id: M1-T03
+reviewer:
+  reviewer_id: codex-local-review
+  reviewed_at: "2026-06-11"
+  scope:
+    - docs/milestones/M1.md
+  findings: []
+  conclusion: pass
+  notes:
+    - M1 contains 11 stable task contracts with allowed paths, forbidden paths, required evidence, non-goals, risks, and closeout pointer.

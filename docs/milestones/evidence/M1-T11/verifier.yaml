@@ -2,9 +2,6 @@ schema_version: 1
 task_id: M1-T11
 verifier:
   branch: main
-  base_sha: 9711483aa7e177a1c03fd1b30fb0db7e94a5beb3
-  head_sha: ""
-  commit: ""
   environment:
     os: macOS
     runtime: Python 3
@@ -12,7 +9,7 @@ verifier:
   commands:
     - command: "python3 -m unittest discover tools/agent-bridge/tests"
       exit_code: 0
-      stdout_excerpt: "Ran 8 tests ... OK"
+      stdout_excerpt: "Ran 25 tests ... OK"
       stderr_excerpt: ""
     - command: "tools/agent-bridge/agent-bridge validate docs/milestones/M1.md --json"
       exit_code: 0
@@ -22,6 +19,16 @@ verifier:
       exit_code: 0
       stdout_excerpt: "\"result\": \"pass\""
       stderr_excerpt: ""
-  git_status_before: dirty
-  git_status_after: dirty
+    - command: "tools/agent-bridge/agent-bridge diff-check --task M1-T11 --worktree --json"
+      exit_code: 0
+      stdout_excerpt: "\"result\": \"pass\""
+      stderr_excerpt: ""
+    - command: "tools/agent-bridge/agent-bridge gate --task M1-T01 --json"
+      exit_code: 0
+      stdout_excerpt: "\"result\": \"accepted\""
+      stderr_excerpt: ""
+    - command: "tools/agent-bridge/agent-bridge closeout --milestone-name M1 --dry-run --json"
+      exit_code: 0
+      stdout_excerpt: "\"dry_run\": true; M1-T01..M1-T11 accepted"
+      stderr_excerpt: ""
   conclusion: pass

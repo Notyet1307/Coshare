@@ -1,0 +1,22 @@
+schema_version: 1
+task_id: M1-T06
+verifier:
+  branch: main
+  environment:
+    os: macOS
+    runtime: Python 3
+    package_manager: none
+  commands:
+    - command: "python3 -m unittest discover tools/agent-bridge/tests"
+      exit_code: 0
+      stdout_excerpt: "Ran 25 tests ... OK"
+      stderr_excerpt: ""
+    - command: "tools/agent-bridge/agent-bridge diff-check --task M1-T01 --worktree --json"
+      exit_code: 0
+      stdout_excerpt: "\"result\": \"pass\"; includes untracked/modified evidence and tool files"
+      stderr_excerpt: ""
+    - command: "tools/agent-bridge/agent-bridge diff-check --task M1-T02 --base HEAD --head HEAD --json"
+      exit_code: 0
+      stdout_excerpt: "\"result\": \"pass\"; \"changed_files\": []"
+      stderr_excerpt: ""
+  conclusion: pass

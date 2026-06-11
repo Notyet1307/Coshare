@@ -1,0 +1,15 @@
+schema_version: 1
+task_id: M1-T02
+reviewer:
+  reviewer_id: codex-local-review
+  reviewed_at: "2026-06-11"
+  scope:
+    - docs/agent/task-contract.md
+    - docs/agent/evidence-and-gates.md
+    - docs/agent/execution-modes.md
+    - docs/agent/security-boundaries.md
+    - docs/milestones/_template.md
+  findings: []
+  conclusion: pass
+  notes:
+    - Governance docs define task contracts, evidence gates, execution modes, security boundaries, and milestone template usage.

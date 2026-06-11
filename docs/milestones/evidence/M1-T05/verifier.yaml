@@ -1,0 +1,22 @@
+schema_version: 1
+task_id: M1-T05
+verifier:
+  branch: main
+  environment:
+    os: macOS
+    runtime: Python 3
+    package_manager: none
+  commands:
+    - command: "python3 -m unittest discover tools/agent-bridge/tests"
+      exit_code: 0
+      stdout_excerpt: "Ran 25 tests ... OK"
+      stderr_excerpt: ""
+    - command: "tools/agent-bridge/agent-bridge validate docs/milestones/M1.md --json"
+      exit_code: 0
+      stdout_excerpt: "\"result\": \"valid\"; \"tasks_checked\": 11"
+      stderr_excerpt: ""
+    - command: "python3 inline subprocess check for invalid_missing.md and invalid_duplicate.md"
+      exit_code: 0
+      stdout_excerpt: "invalid_missing exit=1; invalid_duplicate exit=1"
+      stderr_excerpt: ""
+  conclusion: pass

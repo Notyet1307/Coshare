@@ -1,0 +1,15 @@
+schema_version: 1
+task_id: M1-T05
+reviewer:
+  reviewer_id: codex-local-review
+  reviewed_at: "2026-06-11"
+  scope:
+    - tools/agent-bridge/agent_bridge.py
+    - tools/agent-bridge/tests/fixtures/valid_milestone.md
+    - tools/agent-bridge/tests/fixtures/invalid_missing.md
+    - tools/agent-bridge/tests/fixtures/invalid_duplicate.md
+    - tools/agent-bridge/tests/test_agent_bridge.py
+  findings: []
+  conclusion: pass
+  notes:
+    - validate covers required fields, duplicate task IDs, enum checks, evidence requirements, schema version, and invalid exit behavior.

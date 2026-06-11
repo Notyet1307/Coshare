@@ -1,0 +1,13 @@
+schema_version: 1
+task_id: M1-T08
+reviewer:
+  reviewer_id: codex-local-review
+  reviewed_at: "2026-06-11"
+  scope:
+    - tools/agent-bridge/agent_bridge.py
+    - tools/agent-bridge/tests/test_agent_bridge.py
+  findings: []
+  conclusion: pass
+  notes:
+    - gate computes accepted, failed, and inconclusive from path policy, verifier, reviewer, functional test, and blocker evidence.
+    - Missing evidence, failed verifier command, open P1 reviewer finding, and invalid path policy are covered by tests.

@@ -1,0 +1,18 @@
+schema_version: 1
+task_id: M1-T04
+verifier:
+  branch: main
+  environment:
+    os: macOS
+    runtime: Python 3
+    package_manager: none
+  commands:
+    - command: "tools/agent-bridge/agent-bridge validate docs/milestones/M1.md --json"
+      exit_code: 0
+      stdout_excerpt: "\"result\": \"valid\"; \"tasks_checked\": 11"
+      stderr_excerpt: ""
+    - command: "tools/agent-bridge/agent-bridge gate --task M1-T01 --json"
+      exit_code: 0
+      stdout_excerpt: "\"result\": \"accepted\""
+      stderr_excerpt: ""
+  conclusion: pass

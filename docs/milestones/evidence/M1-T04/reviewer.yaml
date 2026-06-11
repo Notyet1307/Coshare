@@ -1,0 +1,14 @@
+schema_version: 1
+task_id: M1-T04
+reviewer:
+  reviewer_id: codex-local-review
+  reviewed_at: "2026-06-11"
+  scope:
+    - tools/agent-bridge/agent-bridge
+    - tools/agent-bridge/agent_bridge.py
+  findings: []
+  conclusion: pass
+  notes:
+    - CLI exposes validate, diff-check, gate, and closeout subcommands.
+    - Parser extracts fenced yaml task-contract blocks.
+    - Bridge does not call model APIs or external issue systems.

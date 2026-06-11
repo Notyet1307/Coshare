@@ -1,0 +1,15 @@
+schema_version: 1
+task_id: M1-T07
+reviewer:
+  reviewer_id: codex-local-review
+  reviewed_at: "2026-06-11"
+  scope:
+    - tools/agent-bridge/agent_bridge.py
+    - tools/agent-bridge/tests/test_agent_bridge.py
+  findings: []
+  conclusion: pass
+  notes:
+    - Evidence checks require verifier commands and exit codes.
+    - Reviewer evidence requires conclusion and concrete finding mappings.
+    - Functional test levels and blocker schemas are validated.
+    - Invalid evidence returns explicit reason codes.

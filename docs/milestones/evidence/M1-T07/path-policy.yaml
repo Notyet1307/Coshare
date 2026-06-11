@@ -1,0 +1,12 @@
+schema_version: 1
+task_id: M1-T07
+result: pass
+changed_files:
+- tools/agent-bridge/README.md
+- tools/agent-bridge/agent_bridge.py
+- tools/agent-bridge/tests/test_agent_bridge.py
+reasons: []
+source:
+  mode: git_range
+  base: c212afa
+  head: 73bf1c9
