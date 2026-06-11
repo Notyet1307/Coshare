@@ -188,9 +188,9 @@ tools/
 
 If the repo already has equivalent files, extend existing files instead of duplicating.
 
-If `AGENTS.md` is absent, create a short root `AGENTS.md` that points to `docs/agent/*`.
+If `AGENTS.md` is absent, create a short root `AGENTS.md` that points to the roadmap, active phase plan, active milestone, and `docs/agent/*`.
 
-If `AGENTS.md` exists, only add a short index section. Do not rewrite unrelated project rules.
+If `AGENTS.md` exists, keep it short and operational. Do not duplicate the full phase plan inside root `AGENTS.md`.
 
 ---
 

@@ -1120,3 +1120,39 @@ Bridge：
 [13]: https://developers.openai.com/codex/integrations/github "Code review in GitHub – Codex | OpenAI Developers"
 [14]: https://api-docs.deepseek.com/news/news260424 "DeepSeek V4 Preview Release | DeepSeek API Docs"
 [15]: https://docs.github.com/articles/about-issues "About issues - GitHub Docs"
+
+## Reference Implementations To Study Later
+
+### spellbook / skills / threads
+
+Reference:
+- https://github.com/majiayu000/spellbook/tree/main/skills/threads
+
+Use later for:
+- Codex-native parallel thread workflow design
+- lane map format
+- worktree/file ownership model
+- planner / worker / reviewer / merge reviewer / closure auditor role split
+- independent review gate
+- remote truth vs local state reporting
+- failure rules for vague worker output, unassigned file touches, repeated failed attempts
+
+Do not copy blindly.
+Adapt into our governance contract and Bridge gate model.
+
+### mattpocock / skills
+
+Reference:
+- https://github.com/mattpocock/skills
+
+Use later for:
+- small composable skill design
+- setup skill pattern
+- issue tracker abstraction: GitHub / Linear / local files
+- shared language / CONTEXT.md pattern
+- ADR integration
+- TDD / diagnose / triage / handoff workflow ideas
+- skill quality structure: hard rules, examples, verification checklists
+
+Do not copy blindly.
+Adopt patterns only after license and architecture review.
