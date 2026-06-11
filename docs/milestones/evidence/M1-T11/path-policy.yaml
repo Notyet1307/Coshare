@@ -2,6 +2,8 @@ schema_version: 1
 task_id: M1-T11
 result: pass
 changed_files:
+- docs/agent/evidence-and-gates.md
+- docs/milestones/M1.md
 - docs/milestones/closeout/M1.md
 - docs/milestones/evidence/M1-T01/path-policy.yaml
 - docs/milestones/evidence/M1-T02/gate-report.yaml
@@ -42,6 +44,11 @@ changed_files:
 - docs/milestones/evidence/M1-T11/path-policy.yaml
 - docs/milestones/evidence/M1-T11/reviewer.yaml
 - docs/milestones/evidence/M1-T11/verifier.yaml
+- tools/agent-bridge/README.md
+- tools/agent-bridge/agent_bridge.py
+- tools/agent-bridge/tests/test_agent_bridge.py
 reasons: []
 source:
-  mode: worktree
+  mode: git_range
+  base: c212afa
+  head: e2c2af3

@@ -2,46 +2,28 @@ schema_version: 1
 task_id: M1-T01
 result: pass
 changed_files:
+- docs/agent/evidence-and-gates.md
+- docs/agent/execution-modes.md
+- docs/agent/security-boundaries.md
+- docs/agent/task-contract.md
+- docs/milestones/M1.md
+- docs/milestones/_template.md
+- docs/milestones/closeout/.gitkeep
 - docs/milestones/closeout/M1.md
+- docs/milestones/evidence/.gitkeep
+- docs/milestones/evidence/M1-T01/gate-report.yaml
 - docs/milestones/evidence/M1-T01/path-policy.yaml
-- docs/milestones/evidence/M1-T02/gate-report.yaml
-- docs/milestones/evidence/M1-T02/path-policy.yaml
-- docs/milestones/evidence/M1-T02/reviewer.yaml
-- docs/milestones/evidence/M1-T03/gate-report.yaml
-- docs/milestones/evidence/M1-T03/path-policy.yaml
-- docs/milestones/evidence/M1-T03/reviewer.yaml
-- docs/milestones/evidence/M1-T04/gate-report.yaml
-- docs/milestones/evidence/M1-T04/path-policy.yaml
-- docs/milestones/evidence/M1-T04/reviewer.yaml
-- docs/milestones/evidence/M1-T04/verifier.yaml
-- docs/milestones/evidence/M1-T05/gate-report.yaml
-- docs/milestones/evidence/M1-T05/path-policy.yaml
-- docs/milestones/evidence/M1-T05/reviewer.yaml
-- docs/milestones/evidence/M1-T05/verifier.yaml
-- docs/milestones/evidence/M1-T06/gate-report.yaml
-- docs/milestones/evidence/M1-T06/path-policy.yaml
-- docs/milestones/evidence/M1-T06/reviewer.yaml
-- docs/milestones/evidence/M1-T06/verifier.yaml
-- docs/milestones/evidence/M1-T07/gate-report.yaml
-- docs/milestones/evidence/M1-T07/path-policy.yaml
-- docs/milestones/evidence/M1-T07/reviewer.yaml
-- docs/milestones/evidence/M1-T07/verifier.yaml
-- docs/milestones/evidence/M1-T08/gate-report.yaml
-- docs/milestones/evidence/M1-T08/path-policy.yaml
-- docs/milestones/evidence/M1-T08/reviewer.yaml
-- docs/milestones/evidence/M1-T08/verifier.yaml
-- docs/milestones/evidence/M1-T09/gate-report.yaml
-- docs/milestones/evidence/M1-T09/path-policy.yaml
-- docs/milestones/evidence/M1-T09/reviewer.yaml
-- docs/milestones/evidence/M1-T09/verifier.yaml
-- docs/milestones/evidence/M1-T10/gate-report.yaml
-- docs/milestones/evidence/M1-T10/path-policy.yaml
-- docs/milestones/evidence/M1-T10/reviewer.yaml
-- docs/milestones/evidence/M1-T10/verifier.yaml
-- docs/milestones/evidence/M1-T11/gate-report.yaml
-- docs/milestones/evidence/M1-T11/path-policy.yaml
-- docs/milestones/evidence/M1-T11/reviewer.yaml
+- docs/milestones/evidence/M1-T01/reviewer.yaml
 - docs/milestones/evidence/M1-T11/verifier.yaml
+- tools/agent-bridge/README.md
+- tools/agent-bridge/agent-bridge
+- tools/agent-bridge/agent_bridge.py
+- tools/agent-bridge/tests/fixtures/invalid_duplicate.md
+- tools/agent-bridge/tests/fixtures/invalid_missing.md
+- tools/agent-bridge/tests/fixtures/valid_milestone.md
+- tools/agent-bridge/tests/test_agent_bridge.py
 reasons: []
 source:
-  mode: worktree
+  mode: git_range
+  base: '9711483'
+  head: c212afa
