@@ -1,0 +1,15 @@
+schema_version: 1
+task_id: M1-T01
+reviewer:
+  reviewer_id: codex-local-review
+  reviewed_at: "2026-06-11"
+  scope:
+    - docs/agent/evidence-and-gates.md
+    - docs/milestones/M1.md
+    - tools/agent-bridge/agent_bridge.py
+    - tools/agent-bridge/tests/test_agent_bridge.py
+  findings: []
+  conclusion: pass
+  notes:
+    - Missing path-policy evidence now makes gate inconclusive.
+    - Reviewer evidence now requires an explicit reviewer.conclusion.

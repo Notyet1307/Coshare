@@ -1,0 +1,25 @@
+schema_version: 1
+task_id: M1-T01
+result: pass
+changed_files:
+- docs/agent/evidence-and-gates.md
+- docs/agent/execution-modes.md
+- docs/agent/security-boundaries.md
+- docs/agent/task-contract.md
+- docs/milestones/M1.md
+- docs/milestones/_template.md
+- docs/milestones/closeout/.gitkeep
+- docs/milestones/closeout/M1.md
+- docs/milestones/evidence/.gitkeep
+- docs/milestones/evidence/M1-T01/gate-report.yaml
+- docs/milestones/evidence/M1-T01/path-policy.yaml
+- docs/milestones/evidence/M1-T01/reviewer.yaml
+- docs/milestones/evidence/M1-T11/verifier.yaml
+- tools/agent-bridge/README.md
+- tools/agent-bridge/agent-bridge
+- tools/agent-bridge/agent_bridge.py
+- tools/agent-bridge/tests/fixtures/invalid_duplicate.md
+- tools/agent-bridge/tests/fixtures/invalid_missing.md
+- tools/agent-bridge/tests/fixtures/valid_milestone.md
+- tools/agent-bridge/tests/test_agent_bridge.py
+reasons: []

@@ -1,0 +1,27 @@
+schema_version: 1
+task_id: M1-T11
+verifier:
+  branch: main
+  base_sha: 9711483aa7e177a1c03fd1b30fb0db7e94a5beb3
+  head_sha: ""
+  commit: ""
+  environment:
+    os: macOS
+    runtime: Python 3
+    package_manager: none
+  commands:
+    - command: "python3 -m unittest discover tools/agent-bridge/tests"
+      exit_code: 0
+      stdout_excerpt: "Ran 8 tests ... OK"
+      stderr_excerpt: ""
+    - command: "tools/agent-bridge/agent-bridge validate docs/milestones/M1.md --json"
+      exit_code: 0
+      stdout_excerpt: "\"result\": \"valid\"; \"tasks_checked\": 11"
+      stderr_excerpt: ""
+    - command: "tools/agent-bridge/agent-bridge diff-check --task M1-T01 --worktree --json"
+      exit_code: 0
+      stdout_excerpt: "\"result\": \"pass\""
+      stderr_excerpt: ""
+  git_status_before: dirty
+  git_status_after: dirty
+  conclusion: pass
