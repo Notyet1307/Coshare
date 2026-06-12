@@ -11,4 +11,8 @@ changed_files:
 - docs/milestones/evidence/M2-T09/verifier.yaml
 reasons: []
 source:
-  mode: worktree
+  mode: git_range
+  base_sha: 85bb5ea
+  head_sha: 182ae03
+  base: 85bb5ea
+  head: 182ae03
