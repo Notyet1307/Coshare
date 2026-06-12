@@ -1,0 +1,20 @@
+schema_version: 1
+task_id: M3-T09
+source: github
+collection:
+  mode: gh
+  network: true
+  source: gh-cli
+github_pr:
+  repo: Notyet1307/Coshare
+  pr_number: 1
+  pr_url: https://github.com/Notyet1307/Coshare/pull/1
+  state: merged
+  draft: false
+  base_branch: main
+  head_branch: codex/phase-3-github-evidence
+  base_sha: bee20f8c75286b6282b345011114239d6f1ddbc2
+  head_sha: 76c06944b509b87b9a55ca8e3a029b49e0e30f68
+  mergeable_state: UNKNOWN
+  queried_at: '2026-06-12T07:16:57Z'
+  conclusion: pass

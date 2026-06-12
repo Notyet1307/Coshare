@@ -1,0 +1,19 @@
+schema_version: 1
+task_id: M3-T06
+verifier:
+  commands:
+    - command: "python3 -m unittest discover tools/agent-bridge/tests"
+      exit_code: 0
+      stdout_excerpt: "Ran 46 tests in 0.176s\n\nOK"
+      stderr_excerpt: ""
+    - command: "tools/agent-bridge/agent-bridge github-evidence --task M3-T06 --from-json tools/agent-bridge/tests/fixtures/github/pass.json --dry-run --json"
+      exit_code: 0
+      stdout_excerpt: "\"result\": \"pass\"\n\"dry_run\": true\n\"github-pr.yaml\"\n\"github-ci.yaml\"\n\"github-reviews.yaml\""
+      stderr_excerpt: ""
+    - command: "tools/agent-bridge/agent-bridge github-evidence --task M3-T06 --from-json tools/agent-bridge/tests/fixtures/github/pass.json --write-evidence --json"
+      exit_code: 0
+      stdout_excerpt: "\"result\": \"pass\"\n\"dry_run\": false\n\"github-pr.yaml\"\n\"github-ci.yaml\"\n\"github-reviews.yaml\""
+      stderr_excerpt: ""
+  conclusion: pass
+  notes:
+    - "Verified offline fixture parsing and evidence writing without live GitHub auth."

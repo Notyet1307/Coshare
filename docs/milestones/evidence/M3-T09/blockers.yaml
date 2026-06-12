@@ -2,7 +2,7 @@ schema_version: 1
 task_id: M3-T09
 blockers:
   - severity: P1
-    status: open
+    status: resolved
     code: no_safe_pr_available
     issue: "No real PR or safe test PR is available in Notyet1307/Coshare."
     evidence:
@@ -12,4 +12,21 @@ blockers:
       - command: "gh pr list --repo Notyet1307/Coshare --state all --limit 20 --json number,title,state,isDraft,headRefName,headRefOid,baseRefName,url"
         exit_code: 0
         stdout_excerpt: "[]"
-    required_action: "Provide an existing safe PR number, or explicitly approve a separate human-driven safe test PR workflow outside Bridge automation."
+    resolution: "Safe test PR #1 was created by the outer Codex session after explicit user approval."
+  - severity: P1
+    status: resolved
+    code: no_ci_checks_available
+    issue: "GitHub reports no checks on PR #1, so M3-T09 CI evidence is inconclusive."
+    evidence:
+      - command: "gh pr checks 1 --repo Notyet1307/Coshare --json name,state,bucket,link,workflow"
+        exit_code: 1
+        stderr_excerpt: "no checks reported on the 'codex/phase-3-github-evidence' branch"
+      - file: "docs/milestones/evidence/M3-T09/github-ci.yaml"
+        excerpt: "conclusion: inconclusive"
+    resolution: "Added .github/workflows/agent-bridge-tests.yml. PR #1 now reports check test=pass."
+    resolved_evidence:
+      - command: "gh pr checks 1 --repo Notyet1307/Coshare --json name,state,bucket,link,workflow"
+        exit_code: 0
+        stdout_excerpt: "[{\"bucket\":\"pass\",\"name\":\"test\",\"state\":\"SUCCESS\",\"workflow\":\"Agent Bridge Tests\"}]"
+      - file: "docs/milestones/evidence/M3-T09/github-ci.yaml"
+        excerpt: "conclusion: pass"

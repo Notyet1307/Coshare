@@ -1,0 +1,7 @@
+schema_version: 1
+task_id: M3-T05
+reviewer:
+  findings: []
+  conclusion: pass
+  notes:
+    - "Review evidence schema covers reviewer, state, commit ID, submitted_at, open blocking reviews, and does not override failed CI evidence."

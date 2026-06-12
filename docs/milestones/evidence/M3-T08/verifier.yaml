@@ -1,0 +1,15 @@
+schema_version: 1
+task_id: M3-T08
+verifier:
+  commands:
+    - command: "python3 -m unittest discover tools/agent-bridge/tests"
+      exit_code: 0
+      stdout_excerpt: "Ran 46 tests in 0.176s\n\nOK"
+      stderr_excerpt: ""
+    - command: "tools/agent-bridge/agent-bridge closeout --task M3-T09 --milestone M3 --milestone-name M3 --json"
+      exit_code: 0
+      stdout_excerpt: "\"result\": \"pass\"\n\"task_id\": \"M3-T09\"\n\"accepted\""
+      stderr_excerpt: ""
+  conclusion: pass
+  notes:
+    - "Closeout includes GitHub PR URL, PR head SHA, CI conclusion, check details, and review summary when evidence exists."

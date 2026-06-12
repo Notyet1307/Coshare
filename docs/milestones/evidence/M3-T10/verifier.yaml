@@ -1,0 +1,24 @@
+schema_version: 1
+task_id: M3-T10
+verifier:
+  commands:
+    - command: "python3 -m unittest discover tools/agent-bridge/tests"
+      exit_code: 0
+      stdout_excerpt: "Ran 46 tests in 0.163s\n\nOK"
+      stderr_excerpt: ""
+    - command: "tools/agent-bridge/agent-bridge validate M1 --json && tools/agent-bridge/agent-bridge validate M2 --json && tools/agent-bridge/agent-bridge validate M3 --json"
+      exit_code: 0
+      stdout_excerpt: "\"docs/milestones/M1.md\"\n\"result\": \"valid\"\n\"docs/milestones/M2.md\"\n\"result\": \"valid\"\n\"docs/milestones/M3.md\"\n\"result\": \"valid\""
+      stderr_excerpt: ""
+    - command: "for t in M3-T01 M3-T02 M3-T03 M3-T04 M3-T05 M3-T06 M3-T07 M3-T08 M3-T09; do tools/agent-bridge/agent-bridge gate --task \"$t\" --json >/tmp/${t}.json || exit $?; done"
+      exit_code: 0
+      stdout_excerpt: "M3-T01 through M3-T09 gate accepted."
+      stderr_excerpt: ""
+    - command: "tools/agent-bridge/agent-bridge closeout --milestone M3 --milestone-name M3 --dry-run --json || test $? -eq 2"
+      exit_code: 0
+      stdout_excerpt: "M3-T01 through M3-T09 accepted; M3-T10 inconclusive before final M3-T10 evidence."
+      stderr_excerpt: ""
+  conclusion: pass
+  notes:
+    - "Exit code 2 for closeout dry-run is expected before M3-T10 self-evidence exists."
+    - "No token storage, GitHub Issue sync, PR creation inside Bridge, push inside Bridge, merge, or GitHub write action was found in Bridge implementation."

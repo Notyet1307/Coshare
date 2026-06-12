@@ -1,0 +1,18 @@
+schema_version: 1
+task_id: M3-T06
+result: pass
+changed_files:
+- tools/agent-bridge/README.md
+- tools/agent-bridge/agent_bridge.py
+- tools/agent-bridge/tests/fixtures/github/ci_failure.json
+- tools/agent-bridge/tests/fixtures/github/pass.json
+- tools/agent-bridge/tests/test_agent_bridge.py
+reasons: []
+source:
+  mode: git_range
+  base_sha: bee20f8c75286b6282b345011114239d6f1ddbc2
+  head_sha: 76c06944b509b87b9a55ca8e3a029b49e0e30f68
+  base: bee20f8c75286b6282b345011114239d6f1ddbc2
+  head: 76c06944b509b87b9a55ca8e3a029b49e0e30f68
+  include_paths:
+  - tools/agent-bridge/**

@@ -1,0 +1,7 @@
+schema_version: 1
+task_id: M3-T07
+reviewer:
+  findings: []
+  conclusion: pass
+  notes:
+    - "Gate checks GitHub evidence only when task contracts declare required_github_evidence, preserving M1/M2 compatibility."

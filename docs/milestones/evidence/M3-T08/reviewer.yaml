@@ -1,0 +1,7 @@
+schema_version: 1
+task_id: M3-T08
+reviewer:
+  findings: []
+  conclusion: pass
+  notes:
+    - "Closeout preserves failed/inconclusive statuses and summarizes GitHub evidence without token values."

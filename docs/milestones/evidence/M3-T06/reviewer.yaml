@@ -1,0 +1,7 @@
+schema_version: 1
+task_id: M3-T06
+reviewer:
+  findings: []
+  conclusion: pass
+  notes:
+    - "github-evidence is explicit, read-only by default, supports fixture mode, and writes only managed evidence files."

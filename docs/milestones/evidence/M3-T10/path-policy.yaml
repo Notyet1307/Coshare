@@ -1,0 +1,14 @@
+schema_version: 1
+task_id: M3-T10
+result: pass
+changed_files:
+- docs/milestones/closeout/M3.md
+- docs/milestones/evidence/M3-T10/path-policy.yaml
+- docs/milestones/evidence/M3-T10/reviewer.yaml
+- docs/milestones/evidence/M3-T10/verifier.yaml
+reasons: []
+source:
+  mode: worktree
+  include_paths:
+  - docs/milestones/evidence/M3-T10/**
+  - docs/milestones/closeout/M3.md

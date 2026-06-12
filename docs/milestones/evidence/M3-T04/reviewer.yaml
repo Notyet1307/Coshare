@@ -1,0 +1,7 @@
+schema_version: 1
+task_id: M3-T04
+reviewer:
+  findings: []
+  conclusion: pass
+  notes:
+    - "CI/check evidence schema and PR/CI gate rules define failed, pending, missing, and unknown required check behavior without inferring required checks from passing checks alone."

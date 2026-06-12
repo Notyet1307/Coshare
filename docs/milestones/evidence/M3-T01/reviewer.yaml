@@ -1,0 +1,7 @@
+schema_version: 1
+task_id: M3-T01
+reviewer:
+  findings: []
+  conclusion: pass
+  notes:
+    - "Phase 3 plan/docs define GitHub PR/CI Evidence Adapter scope, canonical milestone ownership, offline fixture mode, and explicit read-only GitHub boundaries."

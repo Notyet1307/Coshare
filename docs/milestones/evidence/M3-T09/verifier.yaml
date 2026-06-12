@@ -1,0 +1,23 @@
+schema_version: 1
+task_id: M3-T09
+verifier:
+  commands:
+    - command: "python3 -m unittest discover tools/agent-bridge/tests"
+      exit_code: 0
+      stdout_excerpt: "Ran 45 tests in 0.278s\n\nOK"
+      stderr_excerpt: ""
+    - command: "tools/agent-bridge/agent-bridge validate M3 --json"
+      exit_code: 0
+      stdout_excerpt: "\"result\": \"valid\"\n\"tasks_checked\": 10"
+      stderr_excerpt: ""
+    - command: "tools/agent-bridge/agent-bridge github-evidence --task M3-T09 --repo Notyet1307/Coshare --pr 1 --write-evidence --json"
+      exit_code: 0
+      stdout_excerpt: "\"result\": \"pass\"\n\"live\": true\n\"github-pr.yaml\"\n\"github-ci.yaml\"\n\"github-reviews.yaml\""
+      stderr_excerpt: ""
+    - command: "gh pr checks 1 --repo Notyet1307/Coshare --json name,state,bucket,link,workflow"
+      exit_code: 0
+      stdout_excerpt: "[{\"bucket\":\"pass\",\"link\":\"https://github.com/Notyet1307/Coshare/actions/runs/27400378814/job/80976852068\",\"name\":\"test\",\"state\":\"SUCCESS\",\"workflow\":\"Agent Bridge Tests\"}]"
+      stderr_excerpt: ""
+  conclusion: pass
+  notes:
+    - "Verifier confirms PR evidence collection works and PR #1 has a passing GitHub Actions check."

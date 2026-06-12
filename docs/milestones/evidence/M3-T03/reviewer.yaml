@@ -1,0 +1,7 @@
+schema_version: 1
+task_id: M3-T03
+reviewer:
+  findings: []
+  conclusion: pass
+  notes:
+    - "PR evidence schema includes repo, PR number, URL, state, draft, base/head branches, base/head SHAs, collection metadata, and non-acceptance URL semantics."

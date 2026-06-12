@@ -1,0 +1,15 @@
+schema_version: 1
+task_id: M3-T07
+verifier:
+  commands:
+    - command: "python3 -m unittest discover tools/agent-bridge/tests"
+      exit_code: 0
+      stdout_excerpt: "Ran 46 tests in 0.176s\n\nOK"
+      stderr_excerpt: ""
+    - command: "tools/agent-bridge/agent-bridge gate --task M3-T09 --json"
+      exit_code: 0
+      stdout_excerpt: "\"result\": \"accepted\"\n\"github_evidence\": \"pass\""
+      stderr_excerpt: ""
+  conclusion: pass
+  notes:
+    - "Unit tests cover missing GitHub evidence, CI failure, head SHA mismatch, and live no-checks inconclusive behavior."

@@ -1,0 +1,20 @@
+schema_version: 1
+task_id: M3-T09
+source: github
+collection:
+  mode: gh
+  network: true
+  source: gh-cli
+github_ci:
+  repo: Notyet1307/Coshare
+  head_sha: 76c06944b509b87b9a55ca8e3a029b49e0e30f68
+  required_checks_known: false
+  workflow_runs: []
+  check_runs:
+  - name: test
+    status: SUCCESS
+    conclusion: pass
+    url: https://github.com/Notyet1307/Coshare/actions/runs/27400603487/job/80977552923
+    workflow: Agent Bridge Tests
+  status_checks: []
+  conclusion: pass

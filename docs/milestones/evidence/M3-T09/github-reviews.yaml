@@ -1,0 +1,13 @@
+schema_version: 1
+task_id: M3-T09
+source: github
+collection:
+  mode: gh
+  network: true
+  source: gh-cli
+github_reviews:
+  repo: Notyet1307/Coshare
+  pr_number: 1
+  reviews: []
+  open_blocking_reviews: []
+  conclusion: pass

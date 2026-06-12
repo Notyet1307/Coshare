@@ -1,0 +1,7 @@
+schema_version: 1
+task_id: M3-T02
+reviewer:
+  findings: []
+  conclusion: pass
+  notes:
+    - "GitHub auth boundary documents runtime-only auth, token redaction, missing auth as inconclusive, and no live auth requirement for tests."
