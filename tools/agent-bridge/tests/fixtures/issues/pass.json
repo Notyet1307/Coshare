@@ -1,0 +1,13 @@
+{
+  "github_issue": {
+    "repository": "Notyet1307/Coshare",
+    "number": 44,
+    "url": "https://github.com/Notyet1307/Coshare/issues/44",
+    "state": "open",
+    "title": "[FX-T01] Task",
+    "labels": ["agent-bridge", "execution-ticket"],
+    "milestone": "M4",
+    "assignees": ["codex"],
+    "body": "<!-- agent-bridge:task-id FX-T01 -->\n<!-- agent-bridge:canonical-owner repo-doc -->\n<!-- agent-bridge:task-revision 1 -->\n\nThis GitHub Issue is an execution ticket mirror only."
+  }
+}

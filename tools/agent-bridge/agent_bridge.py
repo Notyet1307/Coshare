@@ -65,6 +65,11 @@ GITHUB_EVIDENCE_FILES = {
     "reviews": "github-reviews.yaml",
     "branch_protection": "github-branch-protection.yaml",
 }
+ISSUE_EVIDENCE_FILES = {
+    "issue": "github-issue.yaml",
+    "issue_comment": "github-issue-comment.yaml",
+    "sync_report": "issue-sync-report.yaml",
+}
 TOKEN_KEY_RE = re.compile(r"(token|authorization|cookie|password|secret)", re.IGNORECASE)
 TOKEN_VALUE_RE = re.compile(r"(gh[pousr]_[A-Za-z0-9_]+|github_pat_[A-Za-z0-9_]+|Bearer\s+[A-Za-z0-9._-]+)")
 PROMPT_ROLES = {
@@ -540,6 +545,10 @@ def github_collection(mode: str, network: bool, source: str) -> dict[str, Any]:
     return {"mode": mode, "network": network, "source": source}
 
 
+def issue_collection(mode: str, network: bool, source: str) -> dict[str, Any]:
+    return {"mode": mode, "network": network, "source": source}
+
+
 def github_conclusion(value: Any) -> str:
     normalized = str(value or "").lower()
     if normalized in {"pass", "success", "successful", "accepted"}:
@@ -658,6 +667,276 @@ def load_github_fixture(path: Path, task_id: str) -> tuple[dict[str, dict[str, A
     if not evidence:
         return None, [{"code": "empty_github_fixture", "path": str(path), "message": "Fixture did not contain recognized GitHub evidence sections."}]
     return evidence, []
+
+
+def issue_marker(name: str, value: Any) -> str:
+    return f"<!-- agent-bridge:{name} {value} -->"
+
+
+def parse_issue_markers(body: str) -> dict[str, str | None]:
+    markers: dict[str, str | None] = {}
+    for key in ["task-id", "canonical-owner", "task-revision"]:
+        match = re.search(rf"<!--\s*agent-bridge:{re.escape(key)}\s+(.+?)\s*-->", body or "")
+        markers[key.replace("-", "_")] = match.group(1).strip() if match else None
+    return markers
+
+
+def issue_body_for_task(task: dict[str, Any]) -> str:
+    acceptance = "\n".join(f"- {item}" for item in task.get("acceptance", []))
+    allowed = yaml.safe_dump(task.get("allowed_paths", []), sort_keys=False).strip()
+    forbidden = yaml.safe_dump(task.get("forbidden_paths", []), sort_keys=False).strip()
+    return "\n".join(
+        [
+            issue_marker("task-id", task["task_id"]),
+            issue_marker("canonical-owner", task.get("canonical_owner")),
+            issue_marker("task-revision", task.get("revision")),
+            "",
+            "This GitHub Issue is an execution ticket mirror only.",
+            "",
+            "Canonical task scope remains in the repository milestone document.",
+            "",
+            f"Task: {task.get('title')}",
+            f"Lifecycle: {task.get('lifecycle_status')}",
+            f"Risk: {task.get('risk')}",
+            "",
+            "Acceptance:",
+            acceptance or "- none",
+            "",
+            "Allowed paths:",
+            "```yaml",
+            allowed,
+            "```",
+            "",
+            "Forbidden paths:",
+            "```yaml",
+            forbidden,
+            "```",
+        ]
+    )
+
+
+def normalize_issue_payload(task: dict[str, Any], issue: dict[str, Any], mode: str, source: str) -> dict[str, Any]:
+    task_id = task["task_id"]
+    body = str(issue.get("body") or "")
+    markers = parse_issue_markers(body)
+    task_revision = task.get("revision")
+    issue_number = issue.get("number") or issue.get("issue_number")
+    repository = issue.get("repository") or issue.get("repo")
+    drift_reasons: list[dict[str, Any]] = []
+    conclusion = "pass"
+    if markers.get("task_id") != task_id:
+        drift_reasons.append({"code": "issue_marker_task_id_mismatch", "message": "Issue body task_id marker does not match task."})
+        conclusion = "fail"
+    if markers.get("canonical_owner") != task.get("canonical_owner"):
+        drift_reasons.append({"code": "issue_marker_canonical_owner_mismatch", "message": "Issue body canonical_owner marker does not match task."})
+        conclusion = "fail"
+    marker_revision = markers.get("task_revision")
+    if marker_revision is None:
+        drift_reasons.append({"code": "issue_marker_revision_missing", "message": "Issue body task revision marker is missing."})
+        if conclusion != "fail":
+            conclusion = GATE_INCONCLUSIVE
+    elif str(marker_revision) != str(task_revision):
+        drift_reasons.append({"code": "issue_revision_stale", "message": "Issue body task revision marker is stale."})
+        if conclusion != "fail":
+            conclusion = GATE_INCONCLUSIVE
+    duplicate_numbers = issue.get("duplicate_issue_numbers", [])
+    if isinstance(duplicate_numbers, list) and duplicate_numbers:
+        drift_reasons.append({"code": "duplicate_issue_for_task_id", "message": "Multiple issues reference the same task_id."})
+        conclusion = "fail"
+    state = str(issue.get("state") or issue.get("issue_state") or "").lower()
+    bridge_gate_result = issue.get("bridge_gate_result")
+    if state == "closed" and bridge_gate_result != GATE_ACCEPTED:
+        drift_reasons.append({"code": "issue_closed_without_bridge_acceptance", "message": "Issue is closed but Bridge gate is not accepted."})
+        if conclusion != "fail":
+            conclusion = GATE_INCONCLUSIVE
+    return {
+        "schema_version": 1,
+        "task_id": task_id,
+        "source": "github_issue",
+        "repository": repository,
+        "issue_number": issue_number,
+        "issue_url": issue.get("url") or issue.get("issue_url"),
+        "issue_state": state or None,
+        "title": issue.get("title"),
+        "labels": issue.get("labels", []),
+        "milestone": issue.get("milestone"),
+        "assignees": issue.get("assignees", []),
+        "body_marker_task_id": markers.get("task_id"),
+        "body_marker_canonical_owner": markers.get("canonical_owner"),
+        "body_marker_task_revision": markers.get("task_revision"),
+        "task_revision": task_revision,
+        "sync_mode": mode,
+        "fetched_at" if mode in {"live_read", "offline_fixture"} else "generated_at": utc_now(),
+        "drift_detected": bool(drift_reasons),
+        "drift_reasons": drift_reasons,
+        "duplicate_issue_numbers": duplicate_numbers if isinstance(duplicate_numbers, list) else [],
+        "conclusion": conclusion,
+        "collection": issue_collection(mode, mode == "live_read", source),
+    }
+
+
+def load_issue_fixture(path: Path, task: dict[str, Any]) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
+    if not path.exists():
+        return None, [{"code": "missing_issue_fixture", "path": str(path), "message": "Issue fixture JSON does not exist."}]
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        return None, [{"code": "invalid_issue_fixture_json", "path": str(path), "message": str(exc)}]
+    if not isinstance(raw, dict):
+        return None, [{"code": "invalid_issue_fixture", "path": str(path), "message": "Issue fixture must be a JSON object."}]
+    issue = raw.get("github_issue", raw)
+    if not isinstance(issue, dict):
+        return None, [{"code": "invalid_issue_fixture", "path": str(path), "message": "github_issue must be a JSON object."}]
+    return normalize_issue_payload(task, scrub_secret_values(issue), "offline_fixture", "from-json"), []
+
+
+def load_live_issue(task: dict[str, Any], repo: str, issue_number: str) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
+    payload, error = run_gh_json(["issue", "view", issue_number, "--repo", repo, "--json", "number,url,state,title,labels,milestone,assignees,body"])
+    if error:
+        return None, [error]
+    if not isinstance(payload, dict):
+        return None, [{"code": "invalid_github_issue_payload", "message": "gh issue view returned an unexpected payload."}]
+    issue = {
+        "repository": repo,
+        "number": payload.get("number"),
+        "url": payload.get("url"),
+        "state": str(payload.get("state", "")).lower(),
+        "title": payload.get("title"),
+        "labels": [item.get("name") for item in payload.get("labels", []) if isinstance(item, dict)],
+        "milestone": (payload.get("milestone") or {}).get("title") if isinstance(payload.get("milestone"), dict) else payload.get("milestone"),
+        "assignees": [item.get("login") for item in payload.get("assignees", []) if isinstance(item, dict)],
+        "body": payload.get("body"),
+    }
+    return normalize_issue_payload(task, scrub_secret_values(issue), "live_read", "gh-cli"), []
+
+
+def issue_plan_payload(tasks: list[dict[str, Any]], milestone: Path, repo: str | None) -> dict[str, Any]:
+    seen_task_ids: set[str] = set()
+    seen_issues: dict[str, str] = {}
+    items: list[dict[str, Any]] = []
+    reasons: list[dict[str, Any]] = []
+    for task in tasks:
+        task_id = task.get("task_id")
+        issue_ref = task.get("backend_refs", {}).get("github_issue")
+        action = "create" if not issue_ref else "update"
+        item = {"task_id": task_id, "title": task.get("title"), "github_issue": issue_ref, "action": action}
+        if not issue_ref:
+            item["reason"] = "missing_backend_ref"
+        else:
+            key = str(issue_ref)
+            if key in seen_issues:
+                reasons.append({"code": "duplicate_github_issue_ref", "task_id": task_id, "message": f"Also used by {seen_issues[key]}."})
+            seen_issues[key] = str(task_id)
+        if task_id in seen_task_ids:
+            reasons.append({"code": "duplicate_task_id_conflict", "task_id": task_id, "message": "Duplicate task_id found in plan."})
+        seen_task_ids.add(str(task_id))
+        items.append(item)
+    return {"result": "fail" if any(r["code"].startswith("duplicate") for r in reasons) else "pass", "milestone": rel(milestone), "repo": repo, "dry_run": True, "items": items, "reasons": reasons}
+
+
+def issue_export_payload(task: dict[str, Any], repo: str | None, write: bool, issue_number: str | None = None) -> dict[str, Any]:
+    task_id = task["task_id"]
+    title = f"[{task_id}] {task.get('title')}"
+    body = issue_body_for_task(task)
+    payload = {
+        "result": "pass",
+        "task_id": task_id,
+        "repo": repo,
+        "dry_run": not write,
+        "write": write,
+        "idempotency_key": task_id,
+        "issue_number": issue_number or task.get("backend_refs", {}).get("github_issue"),
+        "title": title,
+        "body": body,
+        "markers": parse_issue_markers(body),
+        "reasons": [],
+    }
+    if not write:
+        return payload
+    if not repo:
+        return {**payload, "result": GATE_INCONCLUSIVE, "reasons": [{"code": "missing_repo", "message": "--repo is required for live write."}]}
+    args = ["issue", "create", "--repo", repo, "--title", title, "--body", body]
+    if payload["issue_number"]:
+        args = ["issue", "edit", str(payload["issue_number"]), "--repo", repo, "--title", title, "--body", body]
+    if not shutil.which("gh"):
+        return {**payload, "result": GATE_INCONCLUSIVE, "reasons": [{"code": "gh_cli_unavailable", "message": "gh CLI is not available."}]}
+    completed = subprocess.run(["gh", *args], cwd=ROOT, text=True, capture_output=True, check=False)
+    if completed.returncode != 0:
+        stderr = completed.stderr or completed.stdout or ""
+        code = "github_auth_unavailable" if "auth" in stderr.lower() or "login" in stderr.lower() else "github_issue_write_failed"
+        return {**payload, "result": GATE_INCONCLUSIVE, "reasons": [{"code": code, "message": f"gh issue write failed with exit code {completed.returncode}."}]}
+    output = (completed.stdout or "").strip()
+    if output.startswith("http"):
+        payload["issue_url"] = output
+    return payload
+
+
+def issue_status_payload(task: dict[str, Any], repo: str | None, issue_number: str | None, fixture: str | None, write_evidence: bool) -> dict[str, Any]:
+    if fixture:
+        evidence, reasons = load_issue_fixture(Path(fixture), task)
+    elif repo and issue_number:
+        evidence, reasons = load_live_issue(task, repo, issue_number)
+    else:
+        evidence, reasons = None, [{"code": "missing_issue_input", "message": "Provide --from-json or both --repo and --issue."}]
+    if reasons:
+        return {"result": GATE_INCONCLUSIVE, "task_id": task["task_id"], "files": [], "reasons": reasons}
+    assert evidence is not None
+    files = []
+    logical_path = logical_evidence_path(task["task_id"], "github-issue.yaml")
+    if not any_match(task.get("managed_artifact_paths", []), logical_path):
+        return {"result": "fail", "task_id": task["task_id"], "files": [], "reasons": [{"code": "outside_managed_artifact_paths", "path": logical_path, "message": "Issue evidence file is outside managed_artifact_paths."}]}
+    if write_evidence:
+        out_dir = evidence_dir(task["task_id"])
+        out_dir.mkdir(parents=True, exist_ok=True)
+        (out_dir / "github-issue.yaml").write_text(yaml.safe_dump(evidence, sort_keys=False), encoding="utf-8")
+        action = "written"
+    else:
+        action = "would_write"
+    files.append({"path": logical_path, "action": action})
+    return {"result": evidence.get("conclusion", GATE_INCONCLUSIVE), "task_id": task["task_id"], "files": files, "issue": evidence, "reasons": evidence.get("drift_reasons", [])}
+
+
+def issue_comment_payload(task: dict[str, Any], repo: str | None, issue_number: str | None, write: bool, write_evidence: bool = False) -> dict[str, Any]:
+    gate = gate_payload(task)
+    body = "\n".join(
+        [
+            f"<!-- agent-bridge:task-id {task['task_id']} -->",
+            "<!-- agent-bridge:managed-comment gate-summary -->",
+            f"Bridge gate result: {gate['result']}",
+            "",
+            "Checks:",
+            yaml.safe_dump(gate.get("checks", {}), sort_keys=True).strip(),
+        ]
+    )
+    payload = {"result": "pass", "task_id": task["task_id"], "dry_run": not write, "repo": repo, "issue_number": issue_number, "comment_body": body, "files": [], "reasons": []}
+    if write:
+        if not repo or not issue_number:
+            payload = {**payload, "result": GATE_INCONCLUSIVE, "reasons": [{"code": "missing_issue_target", "message": "--repo and --issue are required for live write."}]}
+        else:
+            completed = subprocess.run(["gh", "issue", "comment", str(issue_number), "--repo", repo, "--body", body], cwd=ROOT, text=True, capture_output=True, check=False)
+            if completed.returncode != 0:
+                payload = {**payload, "result": GATE_INCONCLUSIVE, "reasons": [{"code": "github_issue_comment_failed", "message": f"gh issue comment failed with exit code {completed.returncode}."}]}
+    if write_evidence:
+        logical_path = logical_evidence_path(task["task_id"], "github-issue-comment.yaml")
+        if not any_match(task.get("managed_artifact_paths", []), logical_path):
+            return {**payload, "result": "fail", "reasons": payload.get("reasons", []) + [{"code": "outside_managed_artifact_paths", "path": logical_path, "message": "Issue comment evidence file is outside managed_artifact_paths."}]}
+        evidence = {
+            "schema_version": 1,
+            "task_id": task["task_id"],
+            "source": "github_issue_comment",
+            "collection": issue_collection("dry_run" if not write else "live_write", bool(write), "gh-cli" if write else "local"),
+            "issue_number": issue_number,
+            "repository": repo,
+            "managed_comment": "gate-summary",
+            "bridge_gate_result": gate["result"],
+            "conclusion": "pass" if payload["result"] == "pass" else GATE_INCONCLUSIVE,
+            "generated_at": utc_now(),
+        }
+        out_dir = evidence_dir(task["task_id"])
+        out_dir.mkdir(parents=True, exist_ok=True)
+        (out_dir / "github-issue-comment.yaml").write_text(yaml.safe_dump(evidence, sort_keys=False), encoding="utf-8")
+        payload["files"].append({"path": logical_path, "action": "written"})
+    return payload
 
 
 def run_gh_json(args: list[str]) -> tuple[dict[str, Any] | list[Any] | None, dict[str, Any] | None]:
@@ -937,6 +1216,83 @@ def check_github_evidence(task: dict[str, Any]) -> tuple[str, list[dict[str, Any
     return result, reasons
 
 
+def required_issue_evidence(task: dict[str, Any]) -> list[str]:
+    value = task.get("required_issue_evidence")
+    if isinstance(value, list):
+        return [str(item) for item in value]
+    issue = task.get("issue_evidence")
+    if isinstance(issue, dict) and isinstance(issue.get("required"), list):
+        return [str(item) for item in issue["required"]]
+    return []
+
+
+def check_issue_evidence(task: dict[str, Any]) -> tuple[str, list[dict[str, Any]]]:
+    required = required_issue_evidence(task)
+    if not required:
+        return "pass", []
+    task_id = task["task_id"]
+    reasons: list[dict[str, Any]] = []
+    result = "pass"
+    for item in required:
+        filename = ISSUE_EVIDENCE_FILES.get(item)
+        if not filename:
+            reasons.append({"code": "unknown_required_issue_evidence", "message": f"Unknown issue evidence requirement: {item}"})
+            result = GATE_INCONCLUSIVE
+            continue
+        data, error = read_evidence(task_id, filename)
+        if error:
+            reasons.append({"code": f"missing_issue_{item}_evidence", "message": f"{filename} is required.", "path": rel(evidence_dir(task_id) / filename)})
+            result = GATE_INCONCLUSIVE
+            continue
+        if item == "issue":
+            if data.get("source") != "github_issue":
+                reasons.append({"code": "invalid_issue_evidence_source", "message": "github-issue.yaml must include source: github_issue."})
+                result = GATE_INCONCLUSIVE
+            if data.get("body_marker_task_id") != task_id:
+                reasons.append({"code": "issue_marker_task_id_mismatch", "message": "Issue body task_id marker does not match task."})
+                result = GATE_FAILED
+            if data.get("body_marker_canonical_owner") != task.get("canonical_owner"):
+                reasons.append({"code": "issue_marker_canonical_owner_mismatch", "message": "Issue body canonical_owner marker does not match task."})
+                result = GATE_FAILED
+            if str(data.get("body_marker_task_revision")) != str(task.get("revision")):
+                reasons.append({"code": "issue_revision_stale", "message": "Issue body task revision marker is missing or stale."})
+                if result != GATE_FAILED:
+                    result = GATE_INCONCLUSIVE
+            duplicates = data.get("duplicate_issue_numbers", [])
+            if isinstance(duplicates, list) and duplicates:
+                reasons.append({"code": "duplicate_issue_for_task_id", "message": "Multiple issues reference the same task_id."})
+                result = GATE_FAILED
+            conclusion = data.get("conclusion")
+            if conclusion in {"fail", "failed"}:
+                for reason in data.get("drift_reasons", []) if isinstance(data.get("drift_reasons"), list) else []:
+                    if isinstance(reason, dict):
+                        reasons.append(reason)
+                result = GATE_FAILED
+            elif conclusion == GATE_INCONCLUSIVE:
+                for reason in data.get("drift_reasons", []) if isinstance(data.get("drift_reasons"), list) else []:
+                    if isinstance(reason, dict):
+                        reasons.append(reason)
+                if result != GATE_FAILED:
+                    result = GATE_INCONCLUSIVE
+        elif item == "issue_comment":
+            if data.get("source") != "github_issue_comment":
+                reasons.append({"code": "invalid_issue_comment_evidence_source", "message": "github-issue-comment.yaml must include source: github_issue_comment."})
+                result = GATE_INCONCLUSIVE
+            if data.get("conclusion") in {"fail", "failed"}:
+                reasons.append({"code": "issue_comment_failed", "message": "GitHub Issue comment evidence failed."})
+                result = GATE_FAILED
+        elif item == "sync_report":
+            conclusion = data.get("conclusion")
+            if conclusion in {"fail", "failed"}:
+                reasons.append({"code": "issue_sync_report_failed", "message": "Issue sync report failed."})
+                result = GATE_FAILED
+            elif conclusion != "pass":
+                reasons.append({"code": "issue_sync_report_inconclusive", "message": "Issue sync report is not passing."})
+                if result != GATE_FAILED:
+                    result = GATE_INCONCLUSIVE
+    return result, reasons
+
+
 def gate_payload(task: dict[str, Any]) -> dict[str, Any]:
     checks = {
         "path_policy": check_path_policy(task),
@@ -945,6 +1301,7 @@ def gate_payload(task: dict[str, Any]) -> dict[str, Any]:
         "functional_test": check_functional(task),
         "blockers": check_blockers(task),
         "github_evidence": check_github_evidence(task),
+        "issue_evidence": check_issue_evidence(task),
     }
     reasons: list[dict[str, Any]] = []
     result = GATE_ACCEPTED
@@ -1203,6 +1560,61 @@ def command_github_evidence(args: argparse.Namespace) -> int:
     return result_exit(payload["result"])
 
 
+def command_issue_plan(args: argparse.Namespace) -> int:
+    milestone = resolve_milestone(args.milestone)
+    tasks, errors = load_validated_tasks(milestone)
+    if errors:
+        return emit({"result": GATE_INCONCLUSIVE, "milestone": rel(milestone), "reasons": errors}, args.json)
+    payload = issue_plan_payload(tasks, milestone, args.repo)
+    return emit(payload, args.json)
+
+
+def command_issue_export(args: argparse.Namespace) -> int:
+    task, errors = find_task(args.task, resolve_milestone(args.milestone, args.task))
+    if errors or task is None:
+        return emit({"result": GATE_INCONCLUSIVE, "task_id": args.task, "reasons": errors}, args.json)
+    payload = issue_export_payload(task, args.repo, args.write, args.issue)
+    if args.json:
+        return emit(payload, True)
+    print(payload["result"])
+    print(payload.get("title", ""))
+    if payload.get("dry_run"):
+        print(payload.get("body", ""))
+    for reason in payload.get("reasons", []):
+        print(f"- {reason.get('code')}: {reason.get('message')}")
+    return result_exit(payload["result"])
+
+
+def command_issue_status(args: argparse.Namespace) -> int:
+    task, errors = find_task(args.task, resolve_milestone(args.milestone, args.task))
+    if errors or task is None:
+        return emit({"result": GATE_INCONCLUSIVE, "task_id": args.task, "reasons": errors}, args.json)
+    payload = issue_status_payload(task, args.repo, args.issue, args.from_json, args.write_evidence)
+    if args.json:
+        return emit(payload, True)
+    print(payload["result"])
+    for item in payload.get("files", []):
+        print(f"- {item['action']}: {item['path']}")
+    for reason in payload.get("reasons", []):
+        print(f"- {reason.get('code')}: {reason.get('message')}")
+    return result_exit(payload["result"])
+
+
+def command_issue_comment(args: argparse.Namespace) -> int:
+    task, errors = find_task(args.task, resolve_milestone(args.milestone, args.task))
+    if errors or task is None:
+        return emit({"result": GATE_INCONCLUSIVE, "task_id": args.task, "reasons": errors}, args.json)
+    payload = issue_comment_payload(task, args.repo, args.issue, args.write, args.write_evidence)
+    if args.json:
+        return emit(payload, True)
+    print(payload["result"])
+    if payload.get("dry_run"):
+        print(payload.get("comment_body", ""))
+    for reason in payload.get("reasons", []):
+        print(f"- {reason.get('code')}: {reason.get('message')}")
+    return result_exit(payload["result"])
+
+
 def command_gate(args: argparse.Namespace) -> int:
     task, errors = find_task(args.task, resolve_milestone(args.milestone, args.task))
     if errors or task is None:
@@ -1307,6 +1719,29 @@ def summarize_github_evidence(task_id: str) -> list[str]:
     return lines
 
 
+def summarize_issue_evidence(task_id: str) -> list[str]:
+    lines: list[str] = []
+    issue_data, _ = read_evidence(task_id, "github-issue.yaml")
+    if issue_data:
+        if issue_data.get("issue_url"):
+            lines.append(f"- Issue: {issue_data.get('issue_url')}")
+        if issue_data.get("issue_state"):
+            lines.append(f"- Issue state: {issue_data.get('issue_state')}")
+        if issue_data.get("body_marker_task_revision"):
+            lines.append(f"- Issue task revision: {issue_data.get('body_marker_task_revision')}")
+        lines.append(f"- Issue conclusion: {issue_data.get('conclusion', 'unknown')}")
+        drift_reasons = issue_data.get("drift_reasons", [])
+        if isinstance(drift_reasons, list) and drift_reasons:
+            lines.append(f"- Issue drift reasons: {', '.join(str(item.get('code', 'reason')) for item in drift_reasons if isinstance(item, dict))}")
+    comment_data, _ = read_evidence(task_id, "github-issue-comment.yaml")
+    if comment_data:
+        lines.append(f"- Issue comment conclusion: {comment_data.get('conclusion', 'present')}")
+    sync_data, _ = read_evidence(task_id, "issue-sync-report.yaml")
+    if sync_data:
+        lines.append(f"- Issue sync report: {sync_data.get('conclusion', sync_data.get('result', 'present'))}")
+    return lines
+
+
 def closeout_block(task: dict[str, Any], gate: dict[str, Any], milestone: Path = DEFAULT_MILESTONE) -> str:
     task_id = task["task_id"]
     status = gate["result"]
@@ -1316,6 +1751,7 @@ def closeout_block(task: dict[str, Any], gate: dict[str, Any], milestone: Path =
     changed_file_lines = "\n".join(f"- {path}" for path in changed_files) or "- none"
     evidence_summary = "\n".join(evidence_lines) or "- none"
     github_summary = "\n".join(summarize_github_evidence(task_id)) or "- none"
+    issue_summary = "\n".join(summarize_issue_evidence(task_id)) or "- none"
     branch = current_branch() or "unknown"
     source_lines = "- none"
     path_policy, _ = read_evidence(task_id, "path-policy.yaml")
@@ -1369,6 +1805,10 @@ Evidence summary:
 GitHub evidence:
 
 {github_summary}
+
+GitHub Issue evidence:
+
+{issue_summary}
 
 Known risks:
 
@@ -1476,6 +1916,41 @@ def build_parser() -> argparse.ArgumentParser:
     github_evidence.add_argument("--dry-run", action="store_true")
     github_evidence.add_argument("--json", action="store_true")
     github_evidence.set_defaults(func=command_github_evidence)
+
+    issue_plan = sub.add_parser("issue-plan")
+    issue_plan.add_argument("--milestone", default=str(DEFAULT_MILESTONE))
+    issue_plan.add_argument("--repo")
+    issue_plan.add_argument("--json", action="store_true")
+    issue_plan.set_defaults(func=command_issue_plan)
+
+    issue_export = sub.add_parser("issue-export")
+    issue_export.add_argument("--task", required=True)
+    issue_export.add_argument("--milestone", default=str(DEFAULT_MILESTONE))
+    issue_export.add_argument("--repo")
+    issue_export.add_argument("--issue")
+    issue_export.add_argument("--write", action="store_true")
+    issue_export.add_argument("--json", action="store_true")
+    issue_export.set_defaults(func=command_issue_export)
+
+    issue_status = sub.add_parser("issue-status")
+    issue_status.add_argument("--task", required=True)
+    issue_status.add_argument("--milestone", default=str(DEFAULT_MILESTONE))
+    issue_status.add_argument("--repo")
+    issue_status.add_argument("--issue")
+    issue_status.add_argument("--from-json")
+    issue_status.add_argument("--write-evidence", action="store_true")
+    issue_status.add_argument("--json", action="store_true")
+    issue_status.set_defaults(func=command_issue_status)
+
+    issue_comment = sub.add_parser("issue-comment")
+    issue_comment.add_argument("--task", required=True)
+    issue_comment.add_argument("--milestone", default=str(DEFAULT_MILESTONE))
+    issue_comment.add_argument("--repo")
+    issue_comment.add_argument("--issue")
+    issue_comment.add_argument("--write", action="store_true")
+    issue_comment.add_argument("--write-evidence", action="store_true")
+    issue_comment.add_argument("--json", action="store_true")
+    issue_comment.set_defaults(func=command_issue_comment)
 
     gate = sub.add_parser("gate")
     gate.add_argument("--task", required=True)

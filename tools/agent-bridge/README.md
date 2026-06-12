@@ -1,12 +1,16 @@
 # agent-bridge
 
-`agent-bridge` is a local governance CLI for Phase 1, Phase 2, and Phase 3.
+`agent-bridge` is a local governance CLI for Phase 1, Phase 2, Phase 3, and Phase 4.
 
 It does not call Codex, DeepSeek, GitLab, Multica, or any model API.
 
 Phase 3 adds explicit read-only GitHub PR/CI evidence collection.
 
+Phase 4 adds GitHub Issue execution ticket evidence. GitHub Issues are mirrors only and are not the canonical task source.
+
 GitHub reads are never the default. Use offline fixture mode for tests.
+
+GitHub writes are never the default. Use dry-run unless the user explicitly authorizes a live write.
 
 ## Commands
 
@@ -20,6 +24,10 @@ tools/agent-bridge/agent-bridge prompt-pack --task M2-T07 --role builder --miles
 tools/agent-bridge/agent-bridge github-evidence --task M3-T06 --milestone docs/milestones/M3.md --from-json tools/agent-bridge/tests/fixtures/github/pass.json --dry-run
 tools/agent-bridge/agent-bridge github-evidence --task M3-T06 --milestone docs/milestones/M3.md --from-json tools/agent-bridge/tests/fixtures/github/pass.json --write-evidence
 tools/agent-bridge/agent-bridge github-evidence --task M3-T09 --milestone docs/milestones/M3.md --repo Notyet1307/Coshare --pr <number> --dry-run
+tools/agent-bridge/agent-bridge issue-plan --milestone docs/milestones/M4.md --repo Notyet1307/Coshare --json
+tools/agent-bridge/agent-bridge issue-export --task M4-T06 --milestone docs/milestones/M4.md --repo Notyet1307/Coshare --json
+tools/agent-bridge/agent-bridge issue-status --task M4-T11 --milestone docs/milestones/M4.md --from-json tools/agent-bridge/tests/fixtures/issues/pass.json --write-evidence --json
+tools/agent-bridge/agent-bridge issue-comment --task M4-T11 --milestone docs/milestones/M4.md --repo Notyet1307/Coshare --issue <number> --write-evidence --json
 tools/agent-bridge/agent-bridge gate --task M3-T09
 tools/agent-bridge/agent-bridge closeout --milestone M3 --milestone-name M3 --dry-run
 tools/agent-bridge/agent-bridge gate --task M1-T08
@@ -38,6 +46,10 @@ These commands support `--json`:
 - `evidence-init`
 - `prompt-pack`
 - `github-evidence`
+- `issue-plan`
+- `issue-export`
+- `issue-status`
+- `issue-comment`
 - `gate`
 - `closeout`
 
@@ -47,9 +59,9 @@ Phase 2 keeps `docs/milestones/M1.md` as the default milestone for backward comp
 
 Use `--milestone docs/milestones/M2.md` for Phase 2 tasks.
 
-Task-scoped commands may infer `docs/milestones/M2.md` or `docs/milestones/M3.md` from task IDs such as `M2-T05` or `M3-T09` when `--milestone` is omitted.
+Task-scoped commands may infer `docs/milestones/M2.md`, `docs/milestones/M3.md`, or `docs/milestones/M4.md` from task IDs such as `M2-T05`, `M3-T09`, or `M4-T11` when `--milestone` is omitted.
 
-Milestone arguments also accept shorthand values such as `M2` and `M3`.
+Milestone arguments also accept shorthand values such as `M2`, `M3`, and `M4`.
 
 `evidence-init` creates skeleton evidence only. It does not mark evidence as passing.
 
@@ -96,6 +108,51 @@ If `gh` auth is missing for a live read, the command returns `inconclusive`.
 Tests must use offline fixture mode and must not require live GitHub auth.
 
 Gate consumes GitHub evidence only when a task contract declares `required_github_evidence`.
+
+## Phase 4 Notes
+
+Phase 4 keeps milestone docs as the canonical task source.
+
+GitHub Issue numbers, URLs, labels, assignees, and comments are execution ticket references only.
+
+`issue-plan` reads milestone contracts and reports issue mapping gaps or duplicate issue refs.
+
+`issue-export` generates an issue title/body from a task contract. It defaults to dry-run. Live issue create/edit requires explicit `--write`.
+
+`issue-status` supports:
+
+- `--from-json <fixture-path>` for offline fixture mode
+- `--repo <owner/name> --issue <number>` for explicit live GitHub reads through `gh`
+- `--write-evidence` to write normalized `github-issue.yaml`
+
+`issue-comment` generates a managed Bridge gate-summary comment body. It defaults to dry-run. Live comment posting requires explicit `--write`. It may write `github-issue-comment.yaml` when `--write-evidence` is provided.
+
+Expected Phase 4 evidence files:
+
+- `github-issue.yaml`
+- `github-issue-comment.yaml`
+- `issue-sync-report.yaml`
+
+Live GitHub reads are read-only.
+
+Live GitHub writes must be separately authorized by the user.
+
+The Issue adapter must not:
+
+- make GitHub Issues canonical
+- sync GitHub Issues into milestone docs
+- create issues by default
+- close issues automatically
+- create PRs
+- push branches
+- merge PRs
+- print or write tokens
+
+If `gh` auth is missing for a live read/write, the command returns `inconclusive`.
+
+Tests must use offline fixture mode and must not require live GitHub auth.
+
+Gate consumes issue evidence only when a task contract declares `required_issue_evidence`.
 
 ## Exit Codes
 

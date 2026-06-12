@@ -1,0 +1,29 @@
+schema_version: 1
+task_id: M4-T05
+result: pass
+changed_files:
+- docs/agent/issue-sync-rules.md
+- docs/milestones/M4.md
+- docs/milestones/evidence/M4-T05/gate-report.yaml
+- docs/milestones/evidence/M4-T05/path-policy.yaml
+- docs/milestones/evidence/M4-T05/reviewer.yaml
+- docs/milestones/evidence/M4-T05/verifier.yaml
+- tools/agent-bridge/README.md
+- tools/agent-bridge/agent_bridge.py
+- tools/agent-bridge/tests/fixtures/issues/closed_without_acceptance.json
+- tools/agent-bridge/tests/fixtures/issues/duplicate.json
+- tools/agent-bridge/tests/fixtures/issues/m4_t11_pass.json
+- tools/agent-bridge/tests/fixtures/issues/owner_mismatch.json
+- tools/agent-bridge/tests/fixtures/issues/pass.json
+- tools/agent-bridge/tests/fixtures/issues/stale_revision.json
+- tools/agent-bridge/tests/fixtures/issues/task_id_mismatch.json
+- tools/agent-bridge/tests/test_agent_bridge.py
+reasons: []
+source:
+  mode: worktree
+  include_paths:
+  - tools/agent-bridge/**
+  - docs/agent/issue-sync-rules.md
+  - tools/agent-bridge/README.md
+  - docs/milestones/M4.md
+  - docs/milestones/evidence/M4-T05/**

@@ -1,0 +1,22 @@
+schema_version: 1
+task_id: M4-T01
+result: pass
+changed_files:
+- docs/agent/github-issue-adapter.md
+- docs/agent/github-token-boundaries.md
+- docs/agent/issue-sync-rules.md
+- docs/milestones/M4.md
+- docs/milestones/evidence/M4-T01/gate-report.yaml
+- docs/milestones/evidence/M4-T01/path-policy.yaml
+- docs/milestones/evidence/M4-T01/reviewer.yaml
+- phase-4-development-plan.md
+reasons: []
+source:
+  mode: worktree
+  include_paths:
+  - phase-4-development-plan.md
+  - docs/milestones/M4.md
+  - docs/agent/github-issue-adapter.md
+  - docs/agent/issue-sync-rules.md
+  - docs/agent/github-token-boundaries.md
+  - docs/milestones/evidence/M4-T01/**

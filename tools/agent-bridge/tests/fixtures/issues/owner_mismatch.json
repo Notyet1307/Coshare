@@ -1,0 +1,10 @@
+{
+  "github_issue": {
+    "repository": "Notyet1307/Coshare",
+    "number": 50,
+    "url": "https://github.com/Notyet1307/Coshare/issues/50",
+    "state": "open",
+    "title": "[FX-T01] Task",
+    "body": "<!-- agent-bridge:task-id FX-T01 -->\n<!-- agent-bridge:canonical-owner issue-tracker -->\n<!-- agent-bridge:task-revision 1 -->"
+  }
+}

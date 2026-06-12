@@ -1,0 +1,13 @@
+schema_version: 1
+task_id: M4-T11
+source: github_issue_comment
+collection:
+  mode: dry_run
+  network: false
+  source: local
+issue_number: '411'
+repository: Notyet1307/Coshare
+managed_comment: gate-summary
+bridge_gate_result: inconclusive
+conclusion: pass
+generated_at: '2026-06-12T08:29:16Z'

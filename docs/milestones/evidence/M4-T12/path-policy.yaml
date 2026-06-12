@@ -1,0 +1,17 @@
+schema_version: 1
+task_id: M4-T12
+result: pass
+changed_files:
+- docs/milestones/M4.md
+- docs/milestones/closeout/M4.md
+- docs/milestones/evidence/M4-T12/gate-report.yaml
+- docs/milestones/evidence/M4-T12/path-policy.yaml
+- docs/milestones/evidence/M4-T12/reviewer.yaml
+- docs/milestones/evidence/M4-T12/verifier.yaml
+reasons: []
+source:
+  mode: worktree
+  include_paths:
+  - docs/milestones/evidence/M4-T12/**
+  - docs/milestones/closeout/M4.md
+  - docs/milestones/M4.md

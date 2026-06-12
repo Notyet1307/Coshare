@@ -1,0 +1,10 @@
+schema_version: 1
+task_id: M4-T04
+reviewer:
+  reviewer_id: phase4-doc-review
+  conclusion: pass
+  findings: []
+  notes:
+    - Issue evidence schema documents github-issue.yaml and optional comment/report evidence.
+    - Drift reasons are structured and gate-consumable.
+  reviewed_at: "2026-06-12T08:30:00Z"

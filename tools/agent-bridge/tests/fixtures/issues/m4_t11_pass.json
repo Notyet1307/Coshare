@@ -1,0 +1,13 @@
+{
+  "github_issue": {
+    "repository": "Notyet1307/Coshare",
+    "number": 411,
+    "url": "https://github.com/Notyet1307/Coshare/issues/411",
+    "state": "open",
+    "title": "[M4-T11] Dogfood offline issue ticket flow",
+    "labels": ["agent-bridge", "execution-ticket"],
+    "milestone": "M4",
+    "assignees": [],
+    "body": "<!-- agent-bridge:task-id M4-T11 -->\n<!-- agent-bridge:canonical-owner repo-doc -->\n<!-- agent-bridge:task-revision 1 -->\n\nThis GitHub Issue is an execution ticket mirror only."
+  }
+}

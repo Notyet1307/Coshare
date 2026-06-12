@@ -1,0 +1,10 @@
+schema_version: 1
+task_id: M4-T08
+reviewer:
+  reviewer_id: phase4-code-review
+  conclusion: pass
+  findings: []
+  notes:
+    - issue-comment defaults to dry-run and can write structured comment evidence.
+    - Comment text is generated from Bridge gate facts and is not final acceptance.
+  reviewed_at: "2026-06-12T08:30:00Z"

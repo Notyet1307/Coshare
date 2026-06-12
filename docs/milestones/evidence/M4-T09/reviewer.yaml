@@ -1,0 +1,10 @@
+schema_version: 1
+task_id: M4-T09
+reviewer:
+  reviewer_id: phase4-code-review
+  conclusion: pass
+  findings: []
+  notes:
+    - Gate includes issue_evidence check and preserves existing checks.
+    - Closeout includes GitHub Issue evidence summary when available.
+  reviewed_at: "2026-06-12T08:30:00Z"

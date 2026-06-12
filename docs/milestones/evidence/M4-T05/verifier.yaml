@@ -1,0 +1,17 @@
+schema_version: 1
+task_id: M4-T05
+verifier:
+  conclusion: pass
+  commands:
+    - command: python3 -m unittest discover tools/agent-bridge/tests
+      exit_code: 0
+      stdout_excerpt: "Ran 58 tests in 0.273s\n\nOK"
+      stderr_excerpt: ""
+    - command: tools/agent-bridge/agent-bridge issue-plan --milestone docs/milestones/M4.md --repo Notyet1307/Coshare --json
+      exit_code: 0
+      stdout_excerpt: '"result": "pass"'
+      stderr_excerpt: ""
+  environment:
+    network_required: false
+    live_github_write: false
+  verified_at: "2026-06-12T08:30:00Z"

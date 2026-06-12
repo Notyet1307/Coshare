@@ -1,0 +1,10 @@
+schema_version: 1
+task_id: M4-T10
+reviewer:
+  reviewer_id: phase4-code-review
+  conclusion: pass
+  findings: []
+  notes:
+    - Offline fixtures cover pass, marker mismatch, owner mismatch, stale revision, duplicate issue, and closed issue without accepted gate.
+    - Tests do not require live GitHub auth.
+  reviewed_at: "2026-06-12T08:30:00Z"

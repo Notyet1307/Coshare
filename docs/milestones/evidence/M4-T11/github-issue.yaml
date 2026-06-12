@@ -1,0 +1,27 @@
+schema_version: 1
+task_id: M4-T11
+source: github_issue
+repository: Notyet1307/Coshare
+issue_number: 411
+issue_url: https://github.com/Notyet1307/Coshare/issues/411
+issue_state: open
+title: '[M4-T11] Dogfood offline issue ticket flow'
+labels:
+- agent-bridge
+- execution-ticket
+milestone: M4
+assignees: []
+body_marker_task_id: M4-T11
+body_marker_canonical_owner: repo-doc
+body_marker_task_revision: '1'
+task_revision: 1
+sync_mode: offline_fixture
+fetched_at: '2026-06-12T08:29:10Z'
+drift_detected: false
+drift_reasons: []
+duplicate_issue_numbers: []
+conclusion: pass
+collection:
+  mode: offline_fixture
+  network: false
+  source: from-json

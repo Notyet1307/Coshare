@@ -114,6 +114,38 @@ def write_github_ci(evidence_dir: Path, conclusion: str = "pass", head_sha: str 
     )
 
 
+def write_github_issue(evidence_dir: Path, conclusion: str = "pass", task_revision: str = "1"):
+    (evidence_dir / "github-issue.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": 1,
+                "task_id": "FX-T01",
+                "source": "github_issue",
+                "repository": "Notyet1307/Coshare",
+                "issue_number": 44,
+                "issue_url": "https://github.com/Notyet1307/Coshare/issues/44",
+                "issue_state": "open",
+                "title": "[FX-T01] Task",
+                "labels": ["agent-bridge"],
+                "milestone": "M4",
+                "assignees": ["codex"],
+                "body_marker_task_id": "FX-T01",
+                "body_marker_canonical_owner": "repo-doc",
+                "body_marker_task_revision": task_revision,
+                "task_revision": 1,
+                "sync_mode": "offline_fixture",
+                "fetched_at": "2026-06-12T00:00:00Z",
+                "drift_detected": conclusion != "pass",
+                "drift_reasons": [],
+                "duplicate_issue_numbers": [],
+                "conclusion": conclusion,
+                "collection": {"mode": "offline_fixture", "network": False, "source": "from-json"},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
 class AgentBridgeTests(unittest.TestCase):
     def setUp(self):
         self.old_changed_paths = agent_bridge.changed_paths
@@ -801,7 +833,7 @@ class AgentBridgeTests(unittest.TestCase):
         evidence = agent_bridge.normalize_github_fixture(
             "FX-T01",
             {
-                "token": "ghp_runtime_only_value",
+                "token": "runtime_only_value",
                 "github_pr": {
                     "repo": "Notyet1307/Coshare",
                     "pr_number": 1,
@@ -817,7 +849,7 @@ class AgentBridgeTests(unittest.TestCase):
             },
         )
         text = yaml.safe_dump(evidence, sort_keys=False)
-        self.assertNotIn("ghp_runtime_only_value", text)
+        self.assertNotIn("runtime_only_value", text)
 
     def test_github_check_bucket_values_are_normalized(self):
         self.assertEqual(agent_bridge.github_conclusion("pass"), "pass")
@@ -936,6 +968,173 @@ class AgentBridgeTests(unittest.TestCase):
         self.assertIn("GitHub evidence:", block)
         self.assertIn("https://github.com/Notyet1307/Coshare/pull/1", block)
         self.assertIn("CI conclusion: pass", block)
+
+    def test_issue_body_contains_canonical_markers(self):
+        body = agent_bridge.issue_body_for_task(task())
+        markers = agent_bridge.parse_issue_markers(body)
+        self.assertEqual(markers["task_id"], "FX-T01")
+        self.assertEqual(markers["canonical_owner"], "repo-doc")
+        self.assertEqual(markers["task_revision"], "1")
+        self.assertIn("execution ticket mirror only", body)
+
+    def test_issue_status_from_fixture_writes_issue_evidence(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old_root = agent_bridge.EVIDENCE_ROOT
+            agent_bridge.EVIDENCE_ROOT = Path(tmp)
+            try:
+                payload = agent_bridge.issue_status_payload(task(), None, None, str(FIXTURES / "issues" / "pass.json"), True)
+                issue = yaml.safe_load((Path(tmp) / "FX-T01" / "github-issue.yaml").read_text(encoding="utf-8"))
+            finally:
+                agent_bridge.EVIDENCE_ROOT = old_root
+        self.assertEqual(payload["result"], "pass")
+        self.assertEqual(issue["source"], "github_issue")
+        self.assertEqual(issue["collection"]["network"], False)
+        self.assertEqual(issue["body_marker_task_id"], "FX-T01")
+
+    def test_issue_evidence_missing_required_issue_is_inconclusive(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old_root = agent_bridge.EVIDENCE_ROOT
+            agent_bridge.EVIDENCE_ROOT = Path(tmp)
+            evidence_dir = Path(tmp) / "FX-T01"
+            evidence_dir.mkdir()
+            write_path_policy(evidence_dir)
+            try:
+                payload = agent_bridge.gate_payload(task(required_issue_evidence=["issue"]))
+            finally:
+                agent_bridge.EVIDENCE_ROOT = old_root
+        self.assertEqual(payload["result"], "inconclusive")
+        self.assertIn("missing_issue_issue_evidence", {reason["code"] for reason in payload["reasons"]})
+
+    def test_issue_evidence_passes_gate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old_root = agent_bridge.EVIDENCE_ROOT
+            agent_bridge.EVIDENCE_ROOT = Path(tmp)
+            evidence_dir = Path(tmp) / "FX-T01"
+            evidence_dir.mkdir()
+            write_path_policy(evidence_dir)
+            write_github_issue(evidence_dir)
+            try:
+                payload = agent_bridge.gate_payload(task(required_issue_evidence=["issue"]))
+            finally:
+                agent_bridge.EVIDENCE_ROOT = old_root
+        self.assertEqual(payload["result"], "accepted")
+        self.assertEqual(payload["checks"]["issue_evidence"], "pass")
+
+    def test_issue_marker_task_id_mismatch_fails_gate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old_root = agent_bridge.EVIDENCE_ROOT
+            agent_bridge.EVIDENCE_ROOT = Path(tmp)
+            evidence_dir = Path(tmp) / "FX-T01"
+            evidence_dir.mkdir()
+            write_path_policy(evidence_dir)
+            payload = agent_bridge.issue_status_payload(task(), None, None, str(FIXTURES / "issues" / "task_id_mismatch.json"), True)
+            self.assertEqual(payload["result"], "fail")
+            try:
+                gate = agent_bridge.gate_payload(task(required_issue_evidence=["issue"]))
+            finally:
+                agent_bridge.EVIDENCE_ROOT = old_root
+        self.assertEqual(gate["result"], "failed")
+        self.assertIn("issue_marker_task_id_mismatch", {reason["code"] for reason in gate["reasons"]})
+
+    def test_issue_canonical_owner_mismatch_fails_gate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old_root = agent_bridge.EVIDENCE_ROOT
+            agent_bridge.EVIDENCE_ROOT = Path(tmp)
+            evidence_dir = Path(tmp) / "FX-T01"
+            evidence_dir.mkdir()
+            write_path_policy(evidence_dir)
+            agent_bridge.issue_status_payload(task(), None, None, str(FIXTURES / "issues" / "owner_mismatch.json"), True)
+            try:
+                gate = agent_bridge.gate_payload(task(required_issue_evidence=["issue"]))
+            finally:
+                agent_bridge.EVIDENCE_ROOT = old_root
+        self.assertEqual(gate["result"], "failed")
+        self.assertIn("issue_marker_canonical_owner_mismatch", {reason["code"] for reason in gate["reasons"]})
+
+    def test_issue_stale_revision_is_inconclusive(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old_root = agent_bridge.EVIDENCE_ROOT
+            agent_bridge.EVIDENCE_ROOT = Path(tmp)
+            evidence_dir = Path(tmp) / "FX-T01"
+            evidence_dir.mkdir()
+            write_path_policy(evidence_dir)
+            agent_bridge.issue_status_payload(task(), None, None, str(FIXTURES / "issues" / "stale_revision.json"), True)
+            try:
+                gate = agent_bridge.gate_payload(task(required_issue_evidence=["issue"]))
+            finally:
+                agent_bridge.EVIDENCE_ROOT = old_root
+        self.assertEqual(gate["result"], "inconclusive")
+        self.assertIn("issue_revision_stale", {reason["code"] for reason in gate["reasons"]})
+
+    def test_duplicate_issue_for_task_fails_gate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old_root = agent_bridge.EVIDENCE_ROOT
+            agent_bridge.EVIDENCE_ROOT = Path(tmp)
+            evidence_dir = Path(tmp) / "FX-T01"
+            evidence_dir.mkdir()
+            write_path_policy(evidence_dir)
+            agent_bridge.issue_status_payload(task(), None, None, str(FIXTURES / "issues" / "duplicate.json"), True)
+            try:
+                gate = agent_bridge.gate_payload(task(required_issue_evidence=["issue"]))
+            finally:
+                agent_bridge.EVIDENCE_ROOT = old_root
+        self.assertEqual(gate["result"], "failed")
+        self.assertIn("duplicate_issue_for_task_id", {reason["code"] for reason in gate["reasons"]})
+
+    def test_closed_issue_without_acceptance_is_inconclusive(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old_root = agent_bridge.EVIDENCE_ROOT
+            agent_bridge.EVIDENCE_ROOT = Path(tmp)
+            evidence_dir = Path(tmp) / "FX-T01"
+            evidence_dir.mkdir()
+            write_path_policy(evidence_dir)
+            agent_bridge.issue_status_payload(task(), None, None, str(FIXTURES / "issues" / "closed_without_acceptance.json"), True)
+            try:
+                gate = agent_bridge.gate_payload(task(required_issue_evidence=["issue"]))
+            finally:
+                agent_bridge.EVIDENCE_ROOT = old_root
+        self.assertEqual(gate["result"], "inconclusive")
+        self.assertIn("issue_closed_without_bridge_acceptance", {reason["code"] for reason in gate["reasons"]})
+
+    def test_issue_export_dry_run_does_not_write_live_issue(self):
+        payload = agent_bridge.issue_export_payload(task(), "Notyet1307/Coshare", write=False)
+        self.assertEqual(payload["result"], "pass")
+        self.assertTrue(payload["dry_run"])
+        self.assertEqual(payload["markers"]["task_id"], "FX-T01")
+        self.assertIn("Canonical task scope remains", payload["body"])
+
+    def test_issue_comment_dry_run_can_write_comment_evidence(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old_root = agent_bridge.EVIDENCE_ROOT
+            agent_bridge.EVIDENCE_ROOT = Path(tmp)
+            evidence_dir = Path(tmp) / "FX-T01"
+            evidence_dir.mkdir()
+            write_path_policy(evidence_dir)
+            try:
+                payload = agent_bridge.issue_comment_payload(task(), "Notyet1307/Coshare", "44", write=False, write_evidence=True)
+                comment = yaml.safe_load((Path(tmp) / "FX-T01" / "github-issue-comment.yaml").read_text(encoding="utf-8"))
+            finally:
+                agent_bridge.EVIDENCE_ROOT = old_root
+        self.assertEqual(payload["result"], "pass")
+        self.assertEqual(comment["source"], "github_issue_comment")
+        self.assertEqual(comment["collection"]["network"], False)
+
+    def test_closeout_block_includes_issue_evidence_summary(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old_root = agent_bridge.EVIDENCE_ROOT
+            agent_bridge.EVIDENCE_ROOT = Path(tmp)
+            evidence_dir = Path(tmp) / "FX-T01"
+            evidence_dir.mkdir()
+            write_path_policy(evidence_dir)
+            write_github_issue(evidence_dir)
+            try:
+                gate = agent_bridge.gate_payload(task(required_issue_evidence=["issue"]))
+                block = agent_bridge.closeout_block(task(required_issue_evidence=["issue"]), gate, FIXTURES / "valid_milestone.md")
+            finally:
+                agent_bridge.EVIDENCE_ROOT = old_root
+        self.assertIn("GitHub Issue evidence:", block)
+        self.assertIn("https://github.com/Notyet1307/Coshare/issues/44", block)
+        self.assertIn("Issue conclusion: pass", block)
 
 
 if __name__ == "__main__":

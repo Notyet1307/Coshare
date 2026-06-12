@@ -1,0 +1,10 @@
+{
+  "github_issue": {
+    "repository": "Notyet1307/Coshare",
+    "number": 45,
+    "url": "https://github.com/Notyet1307/Coshare/issues/45",
+    "state": "open",
+    "title": "[WRONG-TASK] Task",
+    "body": "<!-- agent-bridge:task-id WRONG-TASK -->\n<!-- agent-bridge:canonical-owner repo-doc -->\n<!-- agent-bridge:task-revision 1 -->"
+  }
+}
