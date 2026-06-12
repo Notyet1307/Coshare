@@ -8,7 +8,12 @@ verifier:
     stdout_excerpt: "{\n  \"prompt\": \"You are acting as builder for task M2-T07.\\\
       n\\nRepository: /Users/yang/Coshare\\nMilestone: docs/milestones/M2.md\\nTask:\
       \ Bridge prompt-pack command\\nMode: direct\\nRisk: medium\\nLifecycle status:\
-      \ ready\\n\\nMilestone docs are the canonical task sourc"
+      \ ready\\n\\nMilestone docs are the canonical task source.\\nDo not treat chat\
+      \ summaries, model confidence, comments, branch names, or issue tracker status\
+      \ as final acceptance evidence.\\n\\nAllowed paths:\\n- tools/agent-bridge/**\\\
+      n- docs/milestones/evidence/M2-T07/**\\n\\nForbidden paths:\\n- docs/agent/**\\\
+      n- docs/milestones/M1.md\\n- docs/milestones/closeout/M1.md\\n- .env\\n- .env.*\\\
+      n- secrets/**\\n-"
     stderr_excerpt: ''
   - command: tools/agent-bridge/agent-bridge prompt-pack --task M2-T07 --role verifier
       --milestone docs/milestones/M2.md --json
@@ -16,7 +21,12 @@ verifier:
     stdout_excerpt: "{\n  \"prompt\": \"You are acting as verifier for task M2-T07.\\\
       n\\nRepository: /Users/yang/Coshare\\nMilestone: docs/milestones/M2.md\\nTask:\
       \ Bridge prompt-pack command\\nMode: direct\\nRisk: medium\\nLifecycle status:\
-      \ ready\\n\\nMilestone docs are the canonical task sour"
+      \ ready\\n\\nMilestone docs are the canonical task source.\\nDo not treat chat\
+      \ summaries, model confidence, comments, branch names, or issue tracker status\
+      \ as final acceptance evidence.\\n\\nAllowed paths:\\n- tools/agent-bridge/**\\\
+      n- docs/milestones/evidence/M2-T07/**\\n\\nForbidden paths:\\n- docs/agent/**\\\
+      n- docs/milestones/M1.md\\n- docs/milestones/closeout/M1.md\\n- .env\\n- .env.*\\\
+      n- secrets/**\\n"
     stderr_excerpt: ''
   - command: tools/agent-bridge/agent-bridge prompt-pack --task M2-T07 --role reviewer
       --milestone docs/milestones/M2.md --json
@@ -24,7 +34,12 @@ verifier:
     stdout_excerpt: "{\n  \"prompt\": \"You are acting as reviewer for task M2-T07.\\\
       n\\nRepository: /Users/yang/Coshare\\nMilestone: docs/milestones/M2.md\\nTask:\
       \ Bridge prompt-pack command\\nMode: direct\\nRisk: medium\\nLifecycle status:\
-      \ ready\\n\\nMilestone docs are the canonical task sour"
+      \ ready\\n\\nMilestone docs are the canonical task source.\\nDo not treat chat\
+      \ summaries, model confidence, comments, branch names, or issue tracker status\
+      \ as final acceptance evidence.\\n\\nAllowed paths:\\n- tools/agent-bridge/**\\\
+      n- docs/milestones/evidence/M2-T07/**\\n\\nForbidden paths:\\n- docs/agent/**\\\
+      n- docs/milestones/M1.md\\n- docs/milestones/closeout/M1.md\\n- .env\\n- .env.*\\\
+      n- secrets/**\\n"
     stderr_excerpt: ''
   - command: tools/agent-bridge/agent-bridge prompt-pack --task M2-T07 --role functional-tester
       --milestone docs/milestones/M2.md --json
@@ -32,7 +47,12 @@ verifier:
     stdout_excerpt: "{\n  \"prompt\": \"You are acting as functional-tester for task\
       \ M2-T07.\\n\\nRepository: /Users/yang/Coshare\\nMilestone: docs/milestones/M2.md\\\
       nTask: Bridge prompt-pack command\\nMode: direct\\nRisk: medium\\nLifecycle\
-      \ status: ready\\n\\nMilestone docs are the canonical "
+      \ status: ready\\n\\nMilestone docs are the canonical task source.\\nDo not\
+      \ treat chat summaries, model confidence, comments, branch names, or issue tracker\
+      \ status as final acceptance evidence.\\n\\nAllowed paths:\\n- tools/agent-bridge/**\\\
+      n- docs/milestones/evidence/M2-T07/**\\n\\nForbidden paths:\\n- docs/agent/**\\\
+      n- docs/milestones/M1.md\\n- docs/milestones/closeout/M1.md\\n- .env\\n- .env.*\\\
+      n- sec"
     stderr_excerpt: ''
   - command: tools/agent-bridge/agent-bridge prompt-pack --task M2-T07 --role closeout
       --milestone docs/milestones/M2.md --json
@@ -40,12 +60,27 @@ verifier:
     stdout_excerpt: "{\n  \"prompt\": \"You are acting as closeout for task M2-T07.\\\
       n\\nRepository: /Users/yang/Coshare\\nMilestone: docs/milestones/M2.md\\nTask:\
       \ Bridge prompt-pack command\\nMode: direct\\nRisk: medium\\nLifecycle status:\
-      \ ready\\n\\nMilestone docs are the canonical task sour"
+      \ ready\\n\\nMilestone docs are the canonical task source.\\nDo not treat chat\
+      \ summaries, model confidence, comments, branch names, or issue tracker status\
+      \ as final acceptance evidence.\\n\\nAllowed paths:\\n- tools/agent-bridge/**\\\
+      n- docs/milestones/evidence/M2-T07/**\\n\\nForbidden paths:\\n- docs/agent/**\\\
+      n- docs/milestones/M1.md\\n- docs/milestones/closeout/M1.md\\n- .env\\n- .env.*\\\
+      n- secrets/**\\n"
     stderr_excerpt: ''
+  - command: python3 -B tools/agent-bridge/tests/test_agent_bridge.py AgentBridgeTests.test_prompt_pack_reads_milestone_non_goals
+    exit_code: 0
+    stdout_excerpt: ''
+    stderr_excerpt: '.
+
+      ----------------------------------------------------------------------
+
+      Ran 1 test in 0.001s
+
+
+      OK'
   environment:
     repo: /Users/yang/Coshare
     branch: main
-    source_mode: git_range
-    base_sha: f3b42ad
-    head_sha: a6dd609
+    source_mode: worktree_pending_stabilization
+    head_before_evidence: c1e9b68
   conclusion: pass

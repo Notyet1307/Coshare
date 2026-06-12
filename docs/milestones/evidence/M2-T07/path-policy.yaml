@@ -3,15 +3,8 @@ task_id: M2-T07
 result: pass
 changed_files:
 - docs/milestones/closeout/M2.md
-- docs/milestones/evidence/M2-T07/blockers.yaml
-- docs/milestones/evidence/M2-T07/gate-report.yaml
 - docs/milestones/evidence/M2-T07/path-policy.yaml
-- docs/milestones/evidence/M2-T07/reviewer.yaml
 - docs/milestones/evidence/M2-T07/verifier.yaml
 reasons: []
 source:
-  mode: git_range
-  base_sha: f3b42ad
-  head_sha: a6dd609
-  base: f3b42ad
-  head: a6dd609
+  mode: worktree
