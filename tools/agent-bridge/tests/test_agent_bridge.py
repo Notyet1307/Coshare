@@ -501,7 +501,8 @@ class AgentBridgeTests(unittest.TestCase):
     def test_closeout_dry_run_does_not_write_file(self):
         with tempfile.TemporaryDirectory() as tmp:
             old_closeout = agent_bridge.CLOSEOUT_ROOT
-            agent_bridge.CLOSEOUT_ROOT = Path(tmp)
+            closeout_root = Path(tmp) / "closeout"
+            agent_bridge.CLOSEOUT_ROOT = closeout_root
             args = type(
                 "Args",
                 (),
@@ -519,7 +520,8 @@ class AgentBridgeTests(unittest.TestCase):
             finally:
                 agent_bridge.CLOSEOUT_ROOT = old_closeout
         self.assertEqual(exit_code, 2)
-        self.assertFalse((Path(tmp) / "FX.md").exists())
+        self.assertFalse((closeout_root / "FX.md").exists())
+        self.assertFalse(closeout_root.exists())
 
     def test_closeout_dry_run_returns_inconclusive_when_selected_task_is_inconclusive(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -609,6 +611,19 @@ class AgentBridgeTests(unittest.TestCase):
         self.assertIn("Forbidden paths:", prompt)
         self.assertIn("Stop conditions:", prompt)
         self.assertIn("model API calls", prompt)
+
+    def test_prompt_pack_reads_milestone_non_goals(self):
+        prompt = agent_bridge.prompt_for_role(task(task_id="M2-T07"), "reviewer", agent_bridge.ROOT / "docs/milestones/M2.md")
+        self.assertIn("GitHub Issue as canonical task source", prompt)
+        self.assertIn("production secret handling", prompt)
+        self.assertIn("VPN/internal network automation", prompt)
+
+    def test_closeout_resume_uses_selected_milestone(self):
+        gate = {"result": "accepted", "checks": {"verifier": "pass"}, "reasons": []}
+        milestone = FIXTURES / "valid_milestone.md"
+        block = agent_bridge.closeout_block(task(), gate, milestone)
+        self.assertIn(f"Read {agent_bridge.rel(milestone)} for task FX-T01.", block)
+        self.assertNotIn("docs/milestones/M2.md or the active milestone", block)
 
     def test_git_range_source_accepts_base_sha_head_sha(self):
         old_commit_exists = agent_bridge.git_commit_exists

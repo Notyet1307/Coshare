@@ -5,33 +5,44 @@ verifier:
   - command: python3 -B -m unittest discover -s tools/agent-bridge/tests -p test*.py
     exit_code: 0
     stdout_excerpt: ''
-    stderr_excerpt: '................................
+    stderr_excerpt: '....................................
 
       ----------------------------------------------------------------------
 
-      Ran 34 tests in 0.111s
+      Ran 36 tests in 0.115s
 
 
       OK'
-  - command: python3 -B tools/agent-bridge/tests/test_agent_bridge.py AgentBridgeTests.test_empty_git_range_with_base_sha_head_sha_is_inconclusive
+  - command: python3 -B tools/agent-bridge/tests/test_agent_bridge.py AgentBridgeTests.test_prompt_pack_reads_milestone_non_goals
     exit_code: 0
     stdout_excerpt: ''
     stderr_excerpt: '.
 
       ----------------------------------------------------------------------
 
-      Ran 1 test in 0.006s
+      Ran 1 test in 0.001s
 
 
       OK'
-  - command: python3 -B tools/agent-bridge/tests/test_agent_bridge.py AgentBridgeTests.test_git_range_source_rejects_invalid_head_sha
+  - command: python3 -B tools/agent-bridge/tests/test_agent_bridge.py AgentBridgeTests.test_closeout_resume_uses_selected_milestone
     exit_code: 0
     stdout_excerpt: ''
     stderr_excerpt: '.
 
       ----------------------------------------------------------------------
 
-      Ran 1 test in 0.000s
+      Ran 1 test in 0.015s
+
+
+      OK'
+  - command: python3 -B tools/agent-bridge/tests/test_agent_bridge.py AgentBridgeTests.test_closeout_dry_run_does_not_write_file
+    exit_code: 0
+    stdout_excerpt: ''
+    stderr_excerpt: '.
+
+      ----------------------------------------------------------------------
+
+      Ran 1 test in 0.019s
 
 
       OK'
@@ -46,7 +57,6 @@ verifier:
   environment:
     repo: /Users/yang/Coshare
     branch: main
-    source_mode: git_range
-    base_sha: 6e42f08
-    head_sha: b209db0
+    source_mode: worktree_pending_stabilization
+    head_before_evidence: '7992240'
   conclusion: pass

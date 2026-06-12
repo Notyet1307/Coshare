@@ -66,6 +66,20 @@ PROMPT_ROLES = {
     "functional-tester",
     "closeout",
 }
+DEFAULT_PHASE_NON_GOALS = [
+    "Multica integration",
+    "GitHub Issue sync",
+    "GitHub Issue as canonical task source",
+    "GitLab integration",
+    "dashboard",
+    "auto-merge",
+    "model API calls",
+    "autonomous long-running loops",
+    "worker metrics routing",
+    "bidirectional sync",
+    "production secret handling",
+    "VPN/internal network automation",
+]
 
 
 class BridgeError(Exception):
@@ -295,6 +309,21 @@ def read_yaml(path: Path) -> tuple[dict[str, Any] | None, dict[str, Any] | None]
     if not isinstance(data, dict):
         return None, {"code": "invalid_evidence", "path": rel(path), "message": "Evidence is not a YAML mapping."}
     return data, None
+
+
+def milestone_non_goals(milestone: Path) -> list[str]:
+    if not milestone.exists():
+        return DEFAULT_PHASE_NON_GOALS
+    text = milestone.read_text(encoding="utf-8")
+    match = re.search(r"^## Non-Goals\s*\n(?P<body>.*?)(?=^## |\Z)", text, flags=re.DOTALL | re.MULTILINE)
+    if not match:
+        return DEFAULT_PHASE_NON_GOALS
+    items = []
+    for line in match.group("body").splitlines():
+        stripped = line.strip()
+        if stripped.startswith("- "):
+            items.append(stripped[2:].strip())
+    return items or DEFAULT_PHASE_NON_GOALS
 
 
 def read_evidence(task_id: str, filename: str) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
@@ -647,6 +676,7 @@ def command_evidence_init(args: argparse.Namespace) -> int:
 
 def prompt_for_role(task: dict[str, Any], role: str, milestone: Path) -> str:
     task_id = task["task_id"]
+    non_goal_lines = "\n".join(f"- {item}" for item in milestone_non_goals(milestone))
     common = f"""You are acting as {role} for task {task_id}.
 
 Repository: {ROOT}
@@ -672,15 +702,7 @@ Stop conditions:
 {yaml.safe_dump(task.get('stop_conditions', []), sort_keys=False).strip()}
 
 Phase 2 non-goals:
-- Multica integration
-- GitHub Issue sync
-- GitLab integration
-- dashboard
-- auto-merge
-- model API calls
-- autonomous long-running loops
-- worker metrics routing
-- bidirectional sync
+{non_goal_lines}
 """
     role_rules = {
         "orchestrator": "Plan role split, check evidence readiness, and never override hard gate rules.",
@@ -773,7 +795,7 @@ def summarize_evidence(task: dict[str, Any]) -> tuple[list[str], list[str]]:
     return evidence_lines, changed_files
 
 
-def closeout_block(task: dict[str, Any], gate: dict[str, Any]) -> str:
+def closeout_block(task: dict[str, Any], gate: dict[str, Any], milestone: Path = DEFAULT_MILESTONE) -> str:
     task_id = task["task_id"]
     status = gate["result"]
     reasons = gate.get("reasons", [])
@@ -798,8 +820,9 @@ def closeout_block(task: dict[str, Any], gate: dict[str, Any]) -> str:
         )
     risk_lines = "- none" if status == GATE_ACCEPTED else reason_lines
     followup_lines = "- none" if status == GATE_ACCEPTED else "- resolve gate reasons and rerun agent-bridge gate"
+    milestone_label = rel(milestone) if milestone.is_relative_to(ROOT) else str(milestone)
     resume_lines = "\n".join([
-        f"- Read docs/milestones/M2.md or the active milestone for task {task_id}.",
+        f"- Read {milestone_label} for task {task_id}.",
         f"- Inspect docs/milestones/evidence/{task_id}/.",
         "- Rerun agent-bridge gate before claiming acceptance.",
     ])
@@ -864,15 +887,15 @@ def command_closeout(args: argparse.Namespace) -> int:
         selected = [task for task in tasks if task.get("task_id") == args.task]
         if not selected:
             return emit({"result": GATE_INCONCLUSIVE, "task_id": args.task, "reasons": [{"code": "task_not_found", "message": f"{args.task} not found."}]}, args.json)
-    CLOSEOUT_ROOT.mkdir(parents=True, exist_ok=True)
     path = CLOSEOUT_ROOT / f"{args.milestone_name}.md"
     text = path.read_text(encoding="utf-8") if path.exists() else f"# {args.milestone_name} Closeout\n"
     results = []
     for task in selected:
         gate = gate_payload(task)
-        text = upsert_block(text, task["task_id"], closeout_block(task, gate))
+        text = upsert_block(text, task["task_id"], closeout_block(task, gate, milestone))
         results.append({"task_id": task["task_id"], "result": gate["result"]})
     if not args.dry_run:
+        CLOSEOUT_ROOT.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding="utf-8")
     result_values = {item["result"] for item in results}
     if GATE_FAILED in result_values:
