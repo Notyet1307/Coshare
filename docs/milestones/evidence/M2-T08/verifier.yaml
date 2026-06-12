@@ -9,7 +9,29 @@ verifier:
 
       ----------------------------------------------------------------------
 
-      Ran 32 tests in 0.122s
+      Ran 34 tests in 0.111s
+
+
+      OK'
+  - command: python3 -B tools/agent-bridge/tests/test_agent_bridge.py AgentBridgeTests.test_empty_git_range_with_base_sha_head_sha_is_inconclusive
+    exit_code: 0
+    stdout_excerpt: ''
+    stderr_excerpt: '.
+
+      ----------------------------------------------------------------------
+
+      Ran 1 test in 0.006s
+
+
+      OK'
+  - command: python3 -B tools/agent-bridge/tests/test_agent_bridge.py AgentBridgeTests.test_git_range_source_rejects_invalid_head_sha
+    exit_code: 0
+    stdout_excerpt: ''
+    stderr_excerpt: '.
+
+      ----------------------------------------------------------------------
+
+      Ran 1 test in 0.000s
 
 
       OK'

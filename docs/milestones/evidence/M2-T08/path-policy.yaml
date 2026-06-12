@@ -3,15 +3,10 @@ task_id: M2-T08
 result: pass
 changed_files:
 - docs/milestones/closeout/M2.md
-- docs/milestones/evidence/M2-T08/blockers.yaml
-- docs/milestones/evidence/M2-T08/gate-report.yaml
 - docs/milestones/evidence/M2-T08/path-policy.yaml
-- docs/milestones/evidence/M2-T08/reviewer.yaml
 - docs/milestones/evidence/M2-T08/verifier.yaml
+- tools/agent-bridge/agent_bridge.py
+- tools/agent-bridge/tests/test_agent_bridge.py
 reasons: []
 source:
-  mode: git_range
-  base_sha: 3f44141
-  head_sha: a646d57
-  base: 3f44141
-  head: a646d57
+  mode: worktree

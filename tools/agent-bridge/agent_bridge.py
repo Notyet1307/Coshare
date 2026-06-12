@@ -425,7 +425,9 @@ def check_path_policy(task: dict[str, Any]) -> tuple[str, list[dict[str, Any]]]:
         return GATE_INCONCLUSIVE, [source_error]
     if sorted(set(str(path) for path in changed_files)) != sorted(set(source_paths or [])):
         return GATE_INCONCLUSIVE, [{"code": "path_policy_changed_files_mismatch", "message": "path-policy.changed_files must match the files changed by its source."}]
-    if source.get("mode") == "git_range" and source.get("base") == source.get("head") and changed_files == []:
+    base_ref = source.get("base_sha") or source.get("base")
+    head_ref = source.get("head_sha") or source.get("head")
+    if source.get("mode") == "git_range" and base_ref == head_ref and changed_files == []:
         return GATE_INCONCLUSIVE, [{"code": "empty_git_range_path_policy", "message": "Empty base/head path-policy evidence does not prove dirty worktree path safety."}]
     if result in {"fail", GATE_FAILED}:
         return GATE_FAILED, reasons or [{"code": "path_policy_failed", "message": "Path policy failed."}]

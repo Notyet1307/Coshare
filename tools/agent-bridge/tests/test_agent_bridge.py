@@ -637,6 +637,50 @@ class AgentBridgeTests(unittest.TestCase):
         self.assertIsNone(paths)
         self.assertEqual(error["code"], "invalid_base_sha")
 
+    def test_git_range_source_rejects_invalid_head_sha(self):
+        old_commit_exists = agent_bridge.git_commit_exists
+        agent_bridge.git_commit_exists = lambda ref: ref == "base"
+        try:
+            paths, error = agent_bridge.changed_paths_from_source(
+                {"mode": "git_range", "base_sha": "base", "head_sha": "missing"}
+            )
+        finally:
+            agent_bridge.git_commit_exists = old_commit_exists
+        self.assertIsNone(paths)
+        self.assertEqual(error["code"], "invalid_head_sha")
+
+    def test_empty_git_range_with_base_sha_head_sha_is_inconclusive(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old_root = agent_bridge.EVIDENCE_ROOT
+            old_commit_exists = agent_bridge.git_commit_exists
+            old_changed_paths = agent_bridge.changed_paths
+            agent_bridge.EVIDENCE_ROOT = Path(tmp)
+            agent_bridge.git_commit_exists = lambda ref: ref == "same"
+            agent_bridge.changed_paths = lambda base, head, worktree: []
+            evidence_dir = Path(tmp) / "FX-T01"
+            evidence_dir.mkdir()
+            (evidence_dir / "path-policy.yaml").write_text(
+                yaml.safe_dump(
+                    {
+                        "schema_version": 1,
+                        "task_id": "FX-T01",
+                        "result": "pass",
+                        "source": {"mode": "git_range", "base_sha": "same", "head_sha": "same"},
+                        "changed_files": [],
+                        "reasons": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            try:
+                payload = agent_bridge.gate_payload(task())
+            finally:
+                agent_bridge.EVIDENCE_ROOT = old_root
+                agent_bridge.git_commit_exists = old_commit_exists
+                agent_bridge.changed_paths = old_changed_paths
+        self.assertEqual(payload["result"], "inconclusive")
+        self.assertEqual(payload["reasons"][0]["code"], "empty_git_range_path_policy")
+
 
 if __name__ == "__main__":
     unittest.main()
