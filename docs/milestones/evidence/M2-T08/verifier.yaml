@@ -47,6 +47,6 @@ verifier:
     repo: /Users/yang/Coshare
     branch: main
     source_mode: git_range
-    base_sha: 3f44141
-    head_sha: a646d57
+    base_sha: 6e42f08
+    head_sha: b209db0
   conclusion: pass
