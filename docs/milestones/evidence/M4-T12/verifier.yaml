@@ -21,7 +21,7 @@ verifier:
       stderr_excerpt: ""
     - command: python3 -m unittest discover tools/agent-bridge/tests
       exit_code: 0
-      stdout_excerpt: "Ran 58 tests in 0.273s\n\nOK"
+      stdout_excerpt: "Ran 59 tests in 0.248s\n\nOK"
       stderr_excerpt: ""
   environment:
     network_required: false

@@ -7,5 +7,6 @@ reviewer:
   notes:
     - Dogfood used offline fixture mode for issue status.
     - Dogfood generated managed comment evidence in dry-run mode.
+    - Managed comment evidence is not required gate evidence to avoid circular acceptance.
     - No live GitHub write was performed.
   reviewed_at: "2026-06-12T08:30:00Z"

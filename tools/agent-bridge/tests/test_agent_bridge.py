@@ -1119,6 +1119,16 @@ class AgentBridgeTests(unittest.TestCase):
         self.assertEqual(comment["source"], "github_issue_comment")
         self.assertEqual(comment["collection"]["network"], False)
 
+    def test_issue_comment_live_write_without_gh_is_inconclusive(self):
+        old_which = agent_bridge.shutil.which
+        agent_bridge.shutil.which = lambda name: None if name == "gh" else old_which(name)
+        try:
+            payload = agent_bridge.issue_comment_payload(task(), "Notyet1307/Coshare", "44", write=True)
+        finally:
+            agent_bridge.shutil.which = old_which
+        self.assertEqual(payload["result"], "inconclusive")
+        self.assertEqual(payload["reasons"][0]["code"], "gh_cli_unavailable")
+
     def test_closeout_block_includes_issue_evidence_summary(self):
         with tempfile.TemporaryDirectory() as tmp:
             old_root = agent_bridge.EVIDENCE_ROOT

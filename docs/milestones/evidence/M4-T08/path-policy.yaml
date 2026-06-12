@@ -4,27 +4,13 @@ result: pass
 changed_files:
 - docs/agent/issue-sync-rules.md
 - docs/milestones/M4.md
-- docs/milestones/evidence/M4-T08/gate-report.yaml
 - docs/milestones/evidence/M4-T08/path-policy.yaml
-- docs/milestones/evidence/M4-T08/reviewer.yaml
 - docs/milestones/evidence/M4-T08/verifier.yaml
-- tools/agent-bridge/README.md
 - tools/agent-bridge/agent_bridge.py
-- tools/agent-bridge/tests/fixtures/issues/closed_without_acceptance.json
-- tools/agent-bridge/tests/fixtures/issues/duplicate.json
-- tools/agent-bridge/tests/fixtures/issues/m4_t11_pass.json
-- tools/agent-bridge/tests/fixtures/issues/owner_mismatch.json
-- tools/agent-bridge/tests/fixtures/issues/pass.json
-- tools/agent-bridge/tests/fixtures/issues/stale_revision.json
-- tools/agent-bridge/tests/fixtures/issues/task_id_mismatch.json
 - tools/agent-bridge/tests/test_agent_bridge.py
 reasons: []
 source:
-  mode: git_range
-  base_sha: 71b903cc6e8df42cd969bbbd184bf3011a25f698
-  head_sha: 81b3a12c840265b69de4f975e470137bf83da470
-  base: 71b903cc6e8df42cd969bbbd184bf3011a25f698
-  head: 81b3a12c840265b69de4f975e470137bf83da470
+  mode: worktree
   include_paths:
   - tools/agent-bridge/**
   - docs/agent/issue-sync-rules.md

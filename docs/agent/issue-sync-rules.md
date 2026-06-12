@@ -45,6 +45,21 @@ Default behavior is dry-run.
 
 Live comment post requires explicit `--write`.
 
+Comment evidence is closeout/dogfood evidence. It must not be required to accept the same gate result that generated the comment.
+
+---
+
+## Duplicate Detection Limits
+
+Phase 4 detects duplicate issue mappings from:
+
+- duplicate `backend_refs.github_issue` values in milestone task contracts
+- fixture-reported `duplicate_issue_numbers`
+
+Phase 4 does not perform live repository-wide issue search to discover duplicate task markers.
+
+If live duplicate discovery is needed later, it must be added as an explicit read-only operation with clear rate-limit, auth, and evidence rules.
+
 ---
 
 ## Forbidden Flows

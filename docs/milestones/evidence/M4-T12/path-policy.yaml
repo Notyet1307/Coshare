@@ -4,17 +4,12 @@ result: pass
 changed_files:
 - docs/milestones/M4.md
 - docs/milestones/closeout/M4.md
-- docs/milestones/evidence/M4-T12/gate-report.yaml
 - docs/milestones/evidence/M4-T12/path-policy.yaml
 - docs/milestones/evidence/M4-T12/reviewer.yaml
 - docs/milestones/evidence/M4-T12/verifier.yaml
 reasons: []
 source:
-  mode: git_range
-  base_sha: 71b903cc6e8df42cd969bbbd184bf3011a25f698
-  head_sha: 81b3a12c840265b69de4f975e470137bf83da470
-  base: 71b903cc6e8df42cd969bbbd184bf3011a25f698
-  head: 81b3a12c840265b69de4f975e470137bf83da470
+  mode: worktree
   include_paths:
   - docs/milestones/evidence/M4-T12/**
   - docs/milestones/closeout/M4.md

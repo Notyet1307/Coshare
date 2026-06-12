@@ -912,6 +912,8 @@ def issue_comment_payload(task: dict[str, Any], repo: str | None, issue_number: 
     if write:
         if not repo or not issue_number:
             payload = {**payload, "result": GATE_INCONCLUSIVE, "reasons": [{"code": "missing_issue_target", "message": "--repo and --issue are required for live write."}]}
+        elif not shutil.which("gh"):
+            payload = {**payload, "result": GATE_INCONCLUSIVE, "reasons": [{"code": "gh_cli_unavailable", "message": "gh CLI is not available."}]}
         else:
             completed = subprocess.run(["gh", "issue", "comment", str(issue_number), "--repo", repo, "--body", body], cwd=ROOT, text=True, capture_output=True, check=False)
             if completed.returncode != 0:

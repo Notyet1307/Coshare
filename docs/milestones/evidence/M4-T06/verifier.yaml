@@ -5,7 +5,7 @@ verifier:
   commands:
     - command: python3 -m unittest discover tools/agent-bridge/tests
       exit_code: 0
-      stdout_excerpt: "Ran 58 tests in 0.273s\n\nOK"
+      stdout_excerpt: "Ran 59 tests in 0.248s\n\nOK"
       stderr_excerpt: ""
     - command: tools/agent-bridge/agent-bridge issue-export --task M4-T06 --milestone docs/milestones/M4.md --repo Notyet1307/Coshare --json
       exit_code: 0

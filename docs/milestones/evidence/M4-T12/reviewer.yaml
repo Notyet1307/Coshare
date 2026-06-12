@@ -7,5 +7,6 @@ reviewer:
   notes:
     - Phase 4 non-goals remain enforced by docs and tests.
     - No live GitHub write evidence is present.
+    - M4 closeout should explicitly preserve no-live-write status for session resume.
     - Final acceptance still requires current gate and closeout results.
   reviewed_at: "2026-06-12T08:30:00Z"
