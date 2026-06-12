@@ -290,9 +290,15 @@ def changed_paths(base: str | None, head: str | None, worktree: bool) -> list[st
 
 def changed_paths_from_source(source: dict[str, Any]) -> tuple[list[str] | None, dict[str, Any] | None]:
     mode = source.get("mode")
+    include_paths = source.get("include_paths")
+    if include_paths is not None and not isinstance(include_paths, list):
+        return None, {"code": "invalid_path_policy_source", "message": "source.include_paths must be a list when present."}
     try:
         if mode == "worktree":
-            return changed_paths(None, None, True), None
+            paths = changed_paths(None, None, True)
+            if include_paths:
+                paths = [path for path in paths if any_match([str(item) for item in include_paths], path)]
+            return paths, None
         if mode == "git_range":
             base = source.get("base_sha") or source.get("base")
             head = source.get("head_sha") or source.get("head")
@@ -302,7 +308,10 @@ def changed_paths_from_source(source: dict[str, Any]) -> tuple[list[str] | None,
                 return None, {"code": "invalid_base_sha", "message": f"base_sha does not resolve: {base}"}
             if not git_commit_exists(str(head)):
                 return None, {"code": "invalid_head_sha", "message": f"head_sha does not resolve: {head}"}
-            return changed_paths(str(base), str(head), False), None
+            paths = changed_paths(str(base), str(head), False)
+            if include_paths:
+                paths = [path for path in paths if any_match([str(item) for item in include_paths], path)]
+            return paths, None
     except BridgeError as exc:
         return None, {"code": "path_policy_source_unavailable", "message": str(exc)}
     return None, {"code": "invalid_path_policy_source", "message": "source.mode must be worktree or git_range."}
@@ -974,6 +983,10 @@ def command_diff_check(args: argparse.Namespace) -> int:
             if args.worktree
             else {"mode": "git_range", "base_sha": args.base, "head_sha": args.head, "base": args.base, "head": args.head}
         )
+        if args.include_path:
+            payload["source"]["include_paths"] = args.include_path
+            payload["changed_files"] = [path for path in payload["changed_files"] if any_match(args.include_path, path)]
+            payload = diff_check_payload(task, payload["changed_files"]) | {"source": payload["source"]}
     except BridgeError as exc:
         payload = {"result": GATE_INCONCLUSIVE, "task_id": args.task, "reasons": [{"code": "git_state_unavailable", "message": str(exc)}]}
     if args.write_evidence:
@@ -1433,6 +1446,7 @@ def build_parser() -> argparse.ArgumentParser:
     diff.add_argument("--base")
     diff.add_argument("--head")
     diff.add_argument("--worktree", action="store_true")
+    diff.add_argument("--include-path", action="append")
     diff.add_argument("--write-evidence", action="store_true")
     diff.add_argument("--json", action="store_true")
     diff.set_defaults(func=command_diff_check)

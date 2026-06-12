@@ -696,6 +696,26 @@ class AgentBridgeTests(unittest.TestCase):
         self.assertIsNone(error)
         self.assertEqual(paths, ["docs/readme.md"])
 
+    def test_git_range_source_filters_include_paths(self):
+        old_commit_exists = agent_bridge.git_commit_exists
+        old_changed_paths = agent_bridge.changed_paths
+        agent_bridge.git_commit_exists = lambda ref: ref in {"base", "head"}
+        agent_bridge.changed_paths = lambda base, head, worktree: ["docs/readme.md", "tools/agent-bridge/agent_bridge.py"]
+        try:
+            paths, error = agent_bridge.changed_paths_from_source(
+                {
+                    "mode": "git_range",
+                    "base_sha": "base",
+                    "head_sha": "head",
+                    "include_paths": ["tools/agent-bridge/**"],
+                }
+            )
+        finally:
+            agent_bridge.git_commit_exists = old_commit_exists
+            agent_bridge.changed_paths = old_changed_paths
+        self.assertIsNone(error)
+        self.assertEqual(paths, ["tools/agent-bridge/agent_bridge.py"])
+
     def test_git_range_source_rejects_invalid_base_sha(self):
         old_commit_exists = agent_bridge.git_commit_exists
         agent_bridge.git_commit_exists = lambda ref: ref == "head"

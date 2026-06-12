@@ -14,6 +14,7 @@ GitHub reads are never the default. Use offline fixture mode for tests.
 tools/agent-bridge/agent-bridge validate docs/milestones/M1.md
 tools/agent-bridge/agent-bridge task-info --task M2-T05 --milestone docs/milestones/M2.md
 tools/agent-bridge/agent-bridge diff-check --task M1-T04 --worktree
+tools/agent-bridge/agent-bridge diff-check --task M3-T06 --base main --head HEAD --include-path tools/agent-bridge/**
 tools/agent-bridge/agent-bridge evidence-init --task M2-T06 --milestone docs/milestones/M2.md --dry-run
 tools/agent-bridge/agent-bridge prompt-pack --task M2-T07 --role builder --milestone docs/milestones/M2.md
 tools/agent-bridge/agent-bridge github-evidence --task M3-T06 --milestone docs/milestones/M3.md --from-json tools/agent-bridge/tests/fixtures/github/pass.json --dry-run
@@ -55,6 +56,8 @@ Milestone arguments also accept shorthand values such as `M2` and `M3`.
 `prompt-pack` generates role prompt text only. It does not call model APIs.
 
 `git_range` path-policy evidence may use `base_sha` / `head_sha`. The gate validates that both commits resolve and that claimed `changed_files` match the git range.
+
+For multi-task commits, `diff-check` supports `--include-path` to validate only the path subset owned by the active task. The generated evidence records `source.include_paths`, and gate recomputes the same filtered source.
 
 ## Phase 3 Notes
 
