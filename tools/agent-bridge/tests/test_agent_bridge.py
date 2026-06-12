@@ -492,9 +492,11 @@ class AgentBridgeTests(unittest.TestCase):
                 agent_bridge.EVIDENCE_ROOT = old_root
         self.assertEqual(first, second)
         self.assertIn("Changed files:", block)
+        self.assertIn("Git facts:", block)
         self.assertIn("Evidence summary:", block)
         self.assertIn("Known risks:", block)
         self.assertIn("Followups:", block)
+        self.assertIn("Resume:", block)
 
     def test_closeout_dry_run_does_not_write_file(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -518,6 +520,93 @@ class AgentBridgeTests(unittest.TestCase):
                 agent_bridge.CLOSEOUT_ROOT = old_closeout
         self.assertEqual(exit_code, 0)
         self.assertFalse((Path(tmp) / "FX.md").exists())
+
+    def test_task_info_payload_includes_contract_boundaries(self):
+        item = task()
+        payload = agent_bridge.task_info_payload(item, FIXTURES / "valid_milestone.md")
+        self.assertEqual(payload["result"], "pass")
+        self.assertEqual(payload["task"]["task_id"], "FX-T01")
+        self.assertEqual(payload["task"]["allowed_paths"], ["docs/**"])
+        self.assertIn(".env", payload["task"]["forbidden_paths"])
+
+    def test_evidence_init_dry_run_does_not_write_and_is_not_false_pass_evidence(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old_root = agent_bridge.EVIDENCE_ROOT
+            agent_bridge.EVIDENCE_ROOT = Path(tmp)
+            item = task(
+                managed_artifact_paths=["**"],
+                required_evidence={
+                    "verifier": "required",
+                    "reviewer": "required",
+                    "functional_test": "not_applicable",
+                }
+            )
+            try:
+                payload = agent_bridge.evidence_init_payload(item, dry_run=True, force=False)
+            finally:
+                agent_bridge.EVIDENCE_ROOT = old_root
+        self.assertEqual(payload["result"], "pass")
+        self.assertEqual({entry["action"] for entry in payload["files"]}, {"would_create"})
+        self.assertFalse((Path(tmp) / "FX-T01" / "verifier.yaml").exists())
+
+    def test_evidence_init_writes_inconclusive_skeletons_only(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old_root = agent_bridge.EVIDENCE_ROOT
+            agent_bridge.EVIDENCE_ROOT = Path(tmp)
+            item = task(
+                managed_artifact_paths=["**"],
+                required_evidence={
+                    "verifier": "required",
+                    "reviewer": "required",
+                    "functional_test": "required",
+                }
+            )
+            try:
+                payload = agent_bridge.evidence_init_payload(item, dry_run=False, force=False)
+                verifier = yaml.safe_load((Path(tmp) / "FX-T01" / "verifier.yaml").read_text(encoding="utf-8"))
+                reviewer = yaml.safe_load((Path(tmp) / "FX-T01" / "reviewer.yaml").read_text(encoding="utf-8"))
+                functional = yaml.safe_load((Path(tmp) / "FX-T01" / "functional-test.yaml").read_text(encoding="utf-8"))
+            finally:
+                agent_bridge.EVIDENCE_ROOT = old_root
+        self.assertEqual(payload["result"], "pass")
+        self.assertEqual(verifier["verifier"]["conclusion"], "inconclusive")
+        self.assertEqual(reviewer["reviewer"]["conclusion"], "inconclusive")
+        self.assertEqual(functional["functional_test"]["conclusion"], "inconclusive")
+
+    def test_prompt_pack_contains_role_boundaries(self):
+        prompt = agent_bridge.prompt_for_role(task(), "builder", FIXTURES / "valid_milestone.md")
+        self.assertIn("Milestone docs are the canonical task source.", prompt)
+        self.assertIn("Allowed paths:", prompt)
+        self.assertIn("Forbidden paths:", prompt)
+        self.assertIn("Stop conditions:", prompt)
+        self.assertIn("model API calls", prompt)
+
+    def test_git_range_source_accepts_base_sha_head_sha(self):
+        old_commit_exists = agent_bridge.git_commit_exists
+        old_changed_paths = agent_bridge.changed_paths
+        agent_bridge.git_commit_exists = lambda ref: ref in {"base", "head"}
+        agent_bridge.changed_paths = lambda base, head, worktree: ["docs/readme.md"]
+        try:
+            paths, error = agent_bridge.changed_paths_from_source(
+                {"mode": "git_range", "base_sha": "base", "head_sha": "head"}
+            )
+        finally:
+            agent_bridge.git_commit_exists = old_commit_exists
+            agent_bridge.changed_paths = old_changed_paths
+        self.assertIsNone(error)
+        self.assertEqual(paths, ["docs/readme.md"])
+
+    def test_git_range_source_rejects_invalid_base_sha(self):
+        old_commit_exists = agent_bridge.git_commit_exists
+        agent_bridge.git_commit_exists = lambda ref: ref == "head"
+        try:
+            paths, error = agent_bridge.changed_paths_from_source(
+                {"mode": "git_range", "base_sha": "missing", "head_sha": "head"}
+            )
+        finally:
+            agent_bridge.git_commit_exists = old_commit_exists
+        self.assertIsNone(paths)
+        self.assertEqual(error["code"], "invalid_base_sha")
 
 
 if __name__ == "__main__":

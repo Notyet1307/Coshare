@@ -57,6 +57,15 @@ FUNCTIONAL_TEST_LEVELS = {"FT-L0", "FT-L1", "FT-L2", "FT-L3", "FT-L4"}
 GATE_ACCEPTED = "accepted"
 GATE_FAILED = "failed"
 GATE_INCONCLUSIVE = "inconclusive"
+PROMPT_ROLES = {
+    "orchestrator",
+    "builder",
+    "test-builder",
+    "verifier",
+    "reviewer",
+    "functional-tester",
+    "closeout",
+}
 
 
 class BridgeError(Exception):
@@ -201,6 +210,21 @@ def run_git(args: list[str]) -> str:
         raise BridgeError(exc.output.strip() or str(exc)) from exc
 
 
+def git_commit_exists(ref: str) -> bool:
+    try:
+        run_git(["rev-parse", "--verify", f"{ref}^{{commit}}"])
+    except BridgeError:
+        return False
+    return True
+
+
+def current_branch() -> str | None:
+    try:
+        return run_git(["branch", "--show-current"]).strip() or None
+    except BridgeError:
+        return None
+
+
 def parse_name_status(output: str) -> list[str]:
     paths: list[str] = []
     for line in output.splitlines():
@@ -232,10 +256,14 @@ def changed_paths_from_source(source: dict[str, Any]) -> tuple[list[str] | None,
         if mode == "worktree":
             return changed_paths(None, None, True), None
         if mode == "git_range":
-            base = source.get("base")
-            head = source.get("head")
+            base = source.get("base_sha") or source.get("base")
+            head = source.get("head_sha") or source.get("head")
             if not base or not head:
-                return None, {"code": "invalid_path_policy_source", "message": "git_range source requires base and head."}
+                return None, {"code": "invalid_path_policy_source", "message": "git_range source requires base_sha/head_sha or base/head."}
+            if not git_commit_exists(str(base)):
+                return None, {"code": "invalid_base_sha", "message": f"base_sha does not resolve: {base}"}
+            if not git_commit_exists(str(head)):
+                return None, {"code": "invalid_head_sha", "message": f"head_sha does not resolve: {head}"}
             return changed_paths(str(base), str(head), False), None
     except BridgeError as exc:
         return None, {"code": "path_policy_source_unavailable", "message": str(exc)}
@@ -467,7 +495,7 @@ def command_diff_check(args: argparse.Namespace) -> int:
         payload["source"] = (
             {"mode": "worktree"}
             if args.worktree
-            else {"mode": "git_range", "base": args.base, "head": args.head}
+            else {"mode": "git_range", "base_sha": args.base, "head_sha": args.head, "base": args.base, "head": args.head}
         )
     except BridgeError as exc:
         payload = {"result": GATE_INCONCLUSIVE, "task_id": args.task, "reasons": [{"code": "git_state_unavailable", "message": str(exc)}]}
@@ -476,6 +504,205 @@ def command_diff_check(args: argparse.Namespace) -> int:
         out_dir.mkdir(parents=True, exist_ok=True)
         (out_dir / "path-policy.yaml").write_text(yaml.safe_dump({"schema_version": 1, "task_id": args.task, **payload}, sort_keys=False), encoding="utf-8")
     return emit(payload, args.json)
+
+
+def task_info_payload(task: dict[str, Any], milestone: Path) -> dict[str, Any]:
+    fields = [
+        "task_id",
+        "title",
+        "canonical_owner",
+        "revision",
+        "mode",
+        "risk",
+        "lifecycle_status",
+        "allowed_paths",
+        "forbidden_paths",
+        "managed_artifact_paths",
+        "acceptance",
+        "required_evidence",
+        "backend_refs",
+        "stop_conditions",
+    ]
+    return {
+        "result": "pass",
+        "milestone": rel(milestone) if milestone.is_relative_to(ROOT) else str(milestone),
+        "task": {field: task.get(field) for field in fields},
+        "reasons": [],
+    }
+
+
+def command_task_info(args: argparse.Namespace) -> int:
+    milestone = Path(args.milestone).resolve()
+    task, errors = find_task(args.task, milestone)
+    if errors or task is None:
+        return emit({"result": GATE_INCONCLUSIVE, "task_id": args.task, "reasons": errors}, args.json)
+    payload = task_info_payload(task, milestone)
+    if args.json:
+        return emit(payload, True)
+    task_data = payload["task"]
+    print(f"{task_data['task_id']}: {task_data['title']}")
+    print(f"milestone: {payload['milestone']}")
+    print(f"mode: {task_data['mode']}")
+    print(f"risk: {task_data['risk']}")
+    print(f"lifecycle_status: {task_data['lifecycle_status']}")
+    print("allowed_paths:")
+    for path in task_data.get("allowed_paths", []):
+        print(f"- {path}")
+    print("forbidden_paths:")
+    for path in task_data.get("forbidden_paths", []):
+        print(f"- {path}")
+    print("required_evidence:")
+    for key, value in task_data.get("required_evidence", {}).items():
+        print(f"- {key}: {value}")
+    print("stop_conditions:")
+    for condition in task_data.get("stop_conditions", []):
+        print(f"- {condition}")
+    return 0
+
+
+def evidence_skeletons(task: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    task_id = task["task_id"]
+    required = task.get("required_evidence", {})
+    skeletons: dict[str, dict[str, Any]] = {
+        "path-policy.yaml": {
+            "schema_version": 1,
+            "task_id": task_id,
+            "result": GATE_INCONCLUSIVE,
+            "source": {"mode": "worktree"},
+            "changed_files": [],
+            "reasons": [{"code": "evidence_initialized", "message": "Skeleton only. Run diff-check to produce path-policy evidence."}],
+        },
+        "blockers.yaml": {"schema_version": 1, "task_id": task_id, "blockers": []},
+    }
+    if required.get("verifier") == "required":
+        skeletons["verifier.yaml"] = {
+            "schema_version": 1,
+            "task_id": task_id,
+            "verifier": {
+                "commands": [],
+                "conclusion": GATE_INCONCLUSIVE,
+            },
+        }
+    if required.get("reviewer") == "required":
+        skeletons["reviewer.yaml"] = {
+            "schema_version": 1,
+            "task_id": task_id,
+            "reviewer": {
+                "findings": [],
+                "conclusion": GATE_INCONCLUSIVE,
+            },
+        }
+    if required.get("functional_test") == "required":
+        skeletons["functional-test.yaml"] = {
+            "schema_version": 1,
+            "task_id": task_id,
+            "functional_test": {
+                "level": None,
+                "conclusion": GATE_INCONCLUSIVE,
+            },
+        }
+    return skeletons
+
+
+def evidence_init_payload(task: dict[str, Any], dry_run: bool, force: bool) -> dict[str, Any]:
+    task_id = task["task_id"]
+    out_dir = evidence_dir(task_id)
+    managed = task.get("managed_artifact_paths", [])
+    files = []
+    reasons = []
+    skeletons = evidence_skeletons(task)
+    for filename, content in skeletons.items():
+        path = out_dir / filename
+        rel_path = rel(path)
+        if not any_match(managed, rel_path):
+            reasons.append({"code": "outside_managed_artifact_paths", "path": rel_path, "message": "Evidence file is outside managed_artifact_paths."})
+            continue
+        action = "would_create" if dry_run else "created"
+        if path.exists() and not force:
+            action = "exists"
+        elif not dry_run:
+            out_dir.mkdir(parents=True, exist_ok=True)
+            path.write_text(yaml.safe_dump(content, sort_keys=False), encoding="utf-8")
+        files.append({"path": rel_path, "action": action})
+    result = "fail" if reasons else "pass"
+    return {"result": result, "task_id": task_id, "dry_run": dry_run, "files": files, "reasons": reasons}
+
+
+def command_evidence_init(args: argparse.Namespace) -> int:
+    task, errors = find_task(args.task, Path(args.milestone).resolve())
+    if errors or task is None:
+        return emit({"result": GATE_INCONCLUSIVE, "task_id": args.task, "reasons": errors}, args.json)
+    payload = evidence_init_payload(task, args.dry_run, args.force)
+    if args.json:
+        return emit(payload, True)
+    print(payload["result"])
+    for item in payload.get("files", []):
+        print(f"- {item['action']}: {item['path']}")
+    for reason in payload.get("reasons", []):
+        print(f"- {reason.get('code')}: {reason.get('message')} ({reason.get('path')})")
+    return result_exit(payload["result"])
+
+
+def prompt_for_role(task: dict[str, Any], role: str, milestone: Path) -> str:
+    task_id = task["task_id"]
+    common = f"""You are acting as {role} for task {task_id}.
+
+Repository: {ROOT}
+Milestone: {rel(milestone) if milestone.is_relative_to(ROOT) else milestone}
+Task: {task.get('title')}
+Mode: {task.get('mode')}
+Risk: {task.get('risk')}
+Lifecycle status: {task.get('lifecycle_status')}
+
+Milestone docs are the canonical task source.
+Do not treat chat summaries, model confidence, comments, branch names, or issue tracker status as final acceptance evidence.
+
+Allowed paths:
+{yaml.safe_dump(task.get('allowed_paths', []), sort_keys=False).strip()}
+
+Forbidden paths:
+{yaml.safe_dump(task.get('forbidden_paths', []), sort_keys=False).strip()}
+
+Required evidence:
+{yaml.safe_dump(task.get('required_evidence', {}), sort_keys=False).strip()}
+
+Stop conditions:
+{yaml.safe_dump(task.get('stop_conditions', []), sort_keys=False).strip()}
+
+Phase 2 non-goals:
+- Multica integration
+- GitHub Issue sync
+- GitLab integration
+- dashboard
+- auto-merge
+- model API calls
+- autonomous long-running loops
+- worker metrics routing
+- bidirectional sync
+"""
+    role_rules = {
+        "orchestrator": "Plan role split, check evidence readiness, and never override hard gate rules.",
+        "builder": "Implement only the requested task. Modify only allowed paths. Report changed files and commands.",
+        "test-builder": "Add or update tests and fixtures only. Do not change production logic unless the task allows it.",
+        "verifier": "Run commands and collect exit codes. Do not modify implementation code.",
+        "reviewer": "Review the diff. Report concrete findings with severity, status, file, issue, and required action.",
+        "functional-tester": "Validate user-observable behavior when applicable. Prefer black-box testing.",
+        "closeout": "Generate closeout from evidence and git facts. Do not mark failed or inconclusive work as accepted.",
+    }
+    return common + "\nRole-specific instructions:\n" + role_rules[role] + "\n"
+
+
+def command_prompt_pack(args: argparse.Namespace) -> int:
+    milestone = Path(args.milestone).resolve()
+    task, errors = find_task(args.task, milestone)
+    if errors or task is None:
+        return emit({"result": GATE_INCONCLUSIVE, "task_id": args.task, "reasons": errors}, args.json)
+    prompt = prompt_for_role(task, args.role, milestone)
+    payload = {"result": "pass", "task_id": args.task, "role": args.role, "prompt": prompt, "reasons": []}
+    if args.json:
+        return emit(payload, True)
+    print(prompt)
+    return 0
 
 
 def command_gate(args: argparse.Namespace) -> int:
@@ -552,8 +779,28 @@ def closeout_block(task: dict[str, Any], gate: dict[str, Any]) -> str:
     evidence_lines, changed_files = summarize_evidence(task)
     changed_file_lines = "\n".join(f"- {path}" for path in changed_files) or "- none"
     evidence_summary = "\n".join(evidence_lines) or "- none"
+    branch = current_branch() or "unknown"
+    source_lines = "- none"
+    path_policy, _ = read_evidence(task_id, "path-policy.yaml")
+    if path_policy and isinstance(path_policy.get("source"), dict):
+        source = path_policy["source"]
+        base = source.get("base_sha") or source.get("base")
+        head = source.get("head_sha") or source.get("head")
+        source_lines = "\n".join(
+            f"- {line}" for line in [
+                f"mode: {source.get('mode')}",
+                f"base: {base}" if base else "",
+                f"head: {head}" if head else "",
+                f"branch: {branch}",
+            ] if line
+        )
     risk_lines = "- none" if status == GATE_ACCEPTED else reason_lines
     followup_lines = "- none" if status == GATE_ACCEPTED else "- resolve gate reasons and rerun agent-bridge gate"
+    resume_lines = "\n".join([
+        f"- Read docs/milestones/M2.md or the active milestone for task {task_id}.",
+        f"- Inspect docs/milestones/evidence/{task_id}/.",
+        "- Rerun agent-bridge gate before claiming acceptance.",
+    ])
     return f"""<!-- agent-bridge:closeout:start {task_id} -->
 ### {task_id}
 
@@ -573,6 +820,10 @@ Changed files:
 
 {changed_file_lines}
 
+Git facts:
+
+{source_lines}
+
 Evidence summary:
 
 {evidence_summary}
@@ -584,6 +835,10 @@ Known risks:
 Followups:
 
 {followup_lines}
+
+Resume:
+
+{resume_lines}
 <!-- agent-bridge:closeout:end {task_id} -->
 """
 
@@ -630,6 +885,12 @@ def build_parser() -> argparse.ArgumentParser:
     validate.add_argument("--json", action="store_true")
     validate.set_defaults(func=command_validate)
 
+    task_info = sub.add_parser("task-info")
+    task_info.add_argument("--task", required=True)
+    task_info.add_argument("--milestone", default=str(DEFAULT_MILESTONE))
+    task_info.add_argument("--json", action="store_true")
+    task_info.set_defaults(func=command_task_info)
+
     diff = sub.add_parser("diff-check")
     diff.add_argument("--task", required=True)
     diff.add_argument("--milestone", default=str(DEFAULT_MILESTONE))
@@ -639,6 +900,21 @@ def build_parser() -> argparse.ArgumentParser:
     diff.add_argument("--write-evidence", action="store_true")
     diff.add_argument("--json", action="store_true")
     diff.set_defaults(func=command_diff_check)
+
+    evidence_init = sub.add_parser("evidence-init")
+    evidence_init.add_argument("--task", required=True)
+    evidence_init.add_argument("--milestone", default=str(DEFAULT_MILESTONE))
+    evidence_init.add_argument("--dry-run", action="store_true")
+    evidence_init.add_argument("--force", action="store_true")
+    evidence_init.add_argument("--json", action="store_true")
+    evidence_init.set_defaults(func=command_evidence_init)
+
+    prompt_pack = sub.add_parser("prompt-pack")
+    prompt_pack.add_argument("--task", required=True)
+    prompt_pack.add_argument("--role", required=True, choices=sorted(PROMPT_ROLES))
+    prompt_pack.add_argument("--milestone", default=str(DEFAULT_MILESTONE))
+    prompt_pack.add_argument("--json", action="store_true")
+    prompt_pack.set_defaults(func=command_prompt_pack)
 
     gate = sub.add_parser("gate")
     gate.add_argument("--task", required=True)
