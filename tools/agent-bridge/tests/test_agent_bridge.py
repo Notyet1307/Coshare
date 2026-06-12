@@ -518,8 +518,37 @@ class AgentBridgeTests(unittest.TestCase):
                     exit_code = agent_bridge.command_closeout(args)
             finally:
                 agent_bridge.CLOSEOUT_ROOT = old_closeout
-        self.assertEqual(exit_code, 0)
+        self.assertEqual(exit_code, 2)
         self.assertFalse((Path(tmp) / "FX.md").exists())
+
+    def test_closeout_dry_run_returns_inconclusive_when_selected_task_is_inconclusive(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old_closeout = agent_bridge.CLOSEOUT_ROOT
+            old_evidence = agent_bridge.EVIDENCE_ROOT
+            agent_bridge.CLOSEOUT_ROOT = Path(tmp) / "closeout"
+            agent_bridge.EVIDENCE_ROOT = Path(tmp) / "evidence"
+            args = type(
+                "Args",
+                (),
+                {
+                    "milestone": str(FIXTURES / "valid_milestone.md"),
+                    "milestone_name": "FX",
+                    "task": None,
+                    "dry_run": True,
+                    "json": True,
+                },
+            )()
+            try:
+                output = io.StringIO()
+                with contextlib.redirect_stdout(output):
+                    exit_code = agent_bridge.command_closeout(args)
+                payload = yaml.safe_load(output.getvalue())
+            finally:
+                agent_bridge.CLOSEOUT_ROOT = old_closeout
+                agent_bridge.EVIDENCE_ROOT = old_evidence
+        self.assertEqual(exit_code, 2)
+        self.assertEqual(payload["result"], "inconclusive")
+        self.assertEqual(payload["tasks"][0]["result"], "inconclusive")
 
     def test_task_info_payload_includes_contract_boundaries(self):
         item = task()

@@ -872,7 +872,14 @@ def command_closeout(args: argparse.Namespace) -> int:
         results.append({"task_id": task["task_id"], "result": gate["result"]})
     if not args.dry_run:
         path.write_text(text, encoding="utf-8")
-    payload = {"result": "pass", "closeout": rel(path), "dry_run": args.dry_run, "tasks": results, "reasons": []}
+    result_values = {item["result"] for item in results}
+    if GATE_FAILED in result_values:
+        aggregate_result = GATE_FAILED
+    elif GATE_INCONCLUSIVE in result_values:
+        aggregate_result = GATE_INCONCLUSIVE
+    else:
+        aggregate_result = "pass"
+    payload = {"result": aggregate_result, "closeout": rel(path), "dry_run": args.dry_run, "tasks": results, "reasons": []}
     return emit(payload, args.json)
 
 
