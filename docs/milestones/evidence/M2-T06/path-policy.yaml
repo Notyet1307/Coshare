@@ -1,0 +1,13 @@
+schema_version: 1
+task_id: M2-T06
+result: pass
+changed_files:
+- docs/milestones/closeout/M2.md
+- docs/milestones/evidence/M2-T06/blockers.yaml
+- docs/milestones/evidence/M2-T06/gate-report.yaml
+- docs/milestones/evidence/M2-T06/path-policy.yaml
+- docs/milestones/evidence/M2-T06/reviewer.yaml
+- docs/milestones/evidence/M2-T06/verifier.yaml
+reasons: []
+source:
+  mode: worktree

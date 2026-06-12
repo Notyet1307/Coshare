@@ -1,0 +1,18 @@
+schema_version: 1
+task_id: M2-T06
+verifier:
+  commands:
+  - command: tools/agent-bridge/agent-bridge evidence-init --task M2-T06 --milestone
+      docs/milestones/M2.md --dry-run --json
+    exit_code: 0
+    stdout_excerpt: "{\n  \"dry_run\": true,\n  \"files\": [\n    {\n      \"action\"\
+      : \"would_create\",\n      \"path\": \"docs/milestones/evidence/M2-T06/path-policy.yaml\"\
+      \n    },\n    {\n      \"action\": \"exists\",\n      \"path\": \"docs/milestones/evidence/M2-T06/blockers.yaml\"\
+      \n    },\n    {\n      \"ac"
+    stderr_excerpt: ''
+  environment:
+    repo: /Users/yang/Coshare
+    branch: main
+    source_mode: worktree_pending_stabilization
+    head_before_evidence: a0c7a3e
+  conclusion: pass
