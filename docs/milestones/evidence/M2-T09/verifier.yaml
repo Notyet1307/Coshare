@@ -1,0 +1,26 @@
+schema_version: 1
+task_id: M2-T09
+verifier:
+  commands:
+    - command: "tools/agent-bridge/agent-bridge validate docs/milestones/M2.md --json"
+      exit_code: 0
+      stdout_excerpt: '"result": "valid", "tasks_checked": 10'
+      stderr_excerpt: ""
+    - command: "python3 -B -m unittest discover -s tools/agent-bridge/tests -p 'test*.py'"
+      exit_code: 0
+      stdout_excerpt: "Ran 31 tests in 0.097s\n\nOK"
+      stderr_excerpt: ""
+    - command: "tools/agent-bridge/agent-bridge task-info --task M2-T09 --milestone docs/milestones/M2.md --json"
+      exit_code: 0
+      stdout_excerpt: '"result": "pass", "task_id": "M2-T09", "title": "Dogfood real small change"'
+      stderr_excerpt: ""
+    - command: "tools/agent-bridge/agent-bridge prompt-pack --task M2-T09 --role verifier --milestone docs/milestones/M2.md --json"
+      exit_code: 0
+      stdout_excerpt: '"role": "verifier", "task_id": "M2-T09", "result": "pass"'
+      stderr_excerpt: ""
+  environment:
+    repo: /Users/yang/Coshare
+    branch: main
+    head_before_evidence: 85bb5ea
+    source_mode: worktree
+  conclusion: pass

@@ -1,0 +1,9 @@
+schema_version: 1
+task_id: M2-T09
+reviewer:
+  findings: []
+  notes:
+    - "M2-T09 dogfood change is limited to docs/agent/git-execution.md and docs/milestones/evidence/M2-T09/** before closeout generation."
+    - "No external integration, model API call, dashboard, auto-merge, or autonomous loop is involved."
+    - "Verifier evidence includes concrete commands and exit codes."
+  conclusion: pass

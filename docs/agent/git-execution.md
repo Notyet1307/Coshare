@@ -179,3 +179,5 @@ It should record:
 - commands run
 - reviewer result
 - final gate result
+
+The dogfood evidence should stay small enough for a later session to audit without reading unrelated task history.

@@ -1,0 +1,14 @@
+schema_version: 1
+task_id: M2-T09
+result: pass
+changed_files:
+- docs/agent/git-execution.md
+- docs/milestones/closeout/M2.md
+- docs/milestones/evidence/M2-T09/blockers.yaml
+- docs/milestones/evidence/M2-T09/gate-report.yaml
+- docs/milestones/evidence/M2-T09/path-policy.yaml
+- docs/milestones/evidence/M2-T09/reviewer.yaml
+- docs/milestones/evidence/M2-T09/verifier.yaml
+reasons: []
+source:
+  mode: worktree
