@@ -20,7 +20,11 @@ changed_files:
 - tools/agent-bridge/tests/test_agent_bridge.py
 reasons: []
 source:
-  mode: worktree
+  mode: git_range
+  base_sha: 71b903cc6e8df42cd969bbbd184bf3011a25f698
+  head_sha: 81b3a12c840265b69de4f975e470137bf83da470
+  base: 71b903cc6e8df42cd969bbbd184bf3011a25f698
+  head: 81b3a12c840265b69de4f975e470137bf83da470
   include_paths:
   - tools/agent-bridge/**
   - docs/agent/issue-sync-rules.md
