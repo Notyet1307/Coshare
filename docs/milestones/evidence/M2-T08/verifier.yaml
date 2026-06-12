@@ -1,0 +1,29 @@
+schema_version: 1
+task_id: M2-T08
+verifier:
+  commands:
+  - command: python3 -B -m unittest discover -s tools/agent-bridge/tests -p test*.py
+    exit_code: 0
+    stdout_excerpt: ''
+    stderr_excerpt: '................................
+
+      ----------------------------------------------------------------------
+
+      Ran 32 tests in 0.122s
+
+
+      OK'
+  - command: tools/agent-bridge/agent-bridge gate --task M2-T09 --milestone docs/milestones/M2.md
+      --json
+    exit_code: 0
+    stdout_excerpt: "{\n  \"checks\": {\n    \"blockers\": \"pass\",\n    \"functional_test\"\
+      : \"pass\",\n    \"path_policy\": \"pass\",\n    \"reviewer\": \"pass\",\n \
+      \   \"verifier\": \"pass\"\n  },\n  \"reasons\": [],\n  \"result\": \"accepted\"\
+      ,\n  \"task_id\": \"M2-T09\"\n}"
+    stderr_excerpt: ''
+  environment:
+    repo: /Users/yang/Coshare
+    branch: main
+    source_mode: worktree_pending_stabilization
+    head_before_evidence: 3f44141
+  conclusion: pass
