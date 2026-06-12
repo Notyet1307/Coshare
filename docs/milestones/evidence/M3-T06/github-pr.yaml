@@ -1,0 +1,20 @@
+schema_version: 1
+task_id: M3-T06
+source: github
+collection:
+  mode: fixture
+  network: false
+  source: from-json
+github_pr:
+  repo: Notyet1307/Coshare
+  pr_number: 1
+  pr_url: https://github.com/Notyet1307/Coshare/pull/1
+  state: open
+  draft: false
+  base_branch: main
+  head_branch: phase-3-fixture
+  base_sha: base-sha
+  head_sha: head-sha
+  mergeable_state: clean
+  queried_at: '2026-06-12T00:00:00Z'
+  conclusion: pass

@@ -1,0 +1,38 @@
+{
+  "github_pr": {
+    "repo": "Notyet1307/Coshare",
+    "pr_number": 2,
+    "pr_url": "https://github.com/Notyet1307/Coshare/pull/2",
+    "state": "open",
+    "draft": false,
+    "base_branch": "main",
+    "head_branch": "phase-3-failing-ci",
+    "base_sha": "base-sha",
+    "head_sha": "head-sha",
+    "mergeable_state": "clean",
+    "queried_at": "2026-06-12T00:00:00Z",
+    "conclusion": "pass"
+  },
+  "github_ci": {
+    "repo": "Notyet1307/Coshare",
+    "head_sha": "head-sha",
+    "required_checks_known": true,
+    "workflow_runs": [
+      {
+        "name": "tests",
+        "status": "completed",
+        "conclusion": "failure",
+        "url": "https://github.com/Notyet1307/Coshare/actions/runs/2"
+      }
+    ],
+    "check_runs": [
+      {
+        "name": "tests",
+        "status": "completed",
+        "conclusion": "failure"
+      }
+    ],
+    "status_checks": [],
+    "conclusion": "fail"
+  }
+}
