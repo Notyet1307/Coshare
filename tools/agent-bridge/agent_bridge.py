@@ -728,14 +728,24 @@ def load_live_github_evidence(task_id: str, repo: str, pr_number: str) -> tuple[
             "check_runs": check_runs,
             "status_checks": [],
         }
-        ci["conclusion"] = infer_ci_conclusion(ci)
-        evidence["github-ci.yaml"] = {
-            "schema_version": 1,
-            "task_id": task_id,
-            "source": "github",
-            "collection": collection,
-            "github_ci": scrub_secret_values(ci),
+    else:
+        ci = {
+            "repo": repo,
+            "head_sha": pr.get("head_sha"),
+            "required_checks_known": False,
+            "workflow_runs": [],
+            "check_runs": [],
+            "status_checks": [],
+            "reasons": [checks_error] if checks_error else [{"code": "github_checks_unavailable", "message": "GitHub checks were unavailable."}],
         }
+    ci["conclusion"] = infer_ci_conclusion(ci)
+    evidence["github-ci.yaml"] = {
+        "schema_version": 1,
+        "task_id": task_id,
+        "source": "github",
+        "collection": collection,
+        "github_ci": scrub_secret_values(ci),
+    }
 
     reviews_payload = pr_payload.get("reviews", [])
     if isinstance(reviews_payload, list):

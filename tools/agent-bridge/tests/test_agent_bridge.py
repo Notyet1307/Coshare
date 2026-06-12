@@ -806,6 +806,37 @@ class AgentBridgeTests(unittest.TestCase):
         self.assertEqual(agent_bridge.github_conclusion("pending"), "inconclusive")
         self.assertEqual(agent_bridge.github_conclusion("skipping"), "skipped")
 
+    def test_live_github_evidence_writes_inconclusive_ci_when_checks_unavailable(self):
+        old_run_gh_json = agent_bridge.run_gh_json
+
+        def fake_run_gh_json(args):
+            if args[:2] == ["pr", "view"]:
+                return {
+                    "number": 1,
+                    "url": "https://github.com/Notyet1307/Coshare/pull/1",
+                    "state": "OPEN",
+                    "isDraft": False,
+                    "baseRefName": "main",
+                    "headRefName": "branch",
+                    "baseRefOid": "base-sha",
+                    "headRefOid": "head-sha",
+                    "mergeable": "MERGEABLE",
+                    "reviews": [],
+                }, None
+            if args[:2] == ["pr", "checks"]:
+                return None, {"code": "github_read_failed", "message": "no checks reported"}
+            return None, {"code": "unexpected_call", "message": "unexpected"}
+
+        agent_bridge.run_gh_json = fake_run_gh_json
+        try:
+            evidence, reasons = agent_bridge.load_live_github_evidence("FX-T01", "Notyet1307/Coshare", "1")
+        finally:
+            agent_bridge.run_gh_json = old_run_gh_json
+        self.assertEqual(reasons, [])
+        self.assertIn("github-ci.yaml", evidence)
+        self.assertEqual(evidence["github-ci.yaml"]["github_ci"]["conclusion"], "inconclusive")
+        self.assertEqual(evidence["github-ci.yaml"]["github_ci"]["reasons"][0]["code"], "github_read_failed")
+
     def test_github_evidence_missing_required_pr_is_inconclusive(self):
         with tempfile.TemporaryDirectory() as tmp:
             old_root = agent_bridge.EVIDENCE_ROOT
