@@ -1,0 +1,11 @@
+schema_version: 1
+task_id: M2-T02
+reviewer:
+  findings: []
+  notes:
+  - M2-T02 evidence was reviewed against docs/milestones/M2.md acceptance criteria.
+  - No external integration, model API call, dashboard, auto-merge, or autonomous
+    loop is involved.
+  - Path-policy evidence is limited to this task evidence directory and M2 closeout
+    updates.
+  conclusion: pass
