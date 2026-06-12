@@ -9,4 +9,8 @@ changed_files:
 - docs/milestones/evidence/M2-T01/reviewer.yaml
 reasons: []
 source:
-  mode: worktree
+  mode: git_range
+  base_sha: 5c5371e
+  head_sha: 948852f
+  base: 5c5371e
+  head: 948852f
