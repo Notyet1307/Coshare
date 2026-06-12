@@ -8,7 +8,11 @@ changed_files:
 - docs/milestones/evidence/M3-T10/verifier.yaml
 reasons: []
 source:
-  mode: worktree
+  mode: git_range
+  base_sha: 08830e1a9f3ead03ca5cb1c12d1109a3ab675cee
+  head_sha: HEAD
+  base: 08830e1a9f3ead03ca5cb1c12d1109a3ab675cee
+  head: HEAD
   include_paths:
   - docs/milestones/evidence/M3-T10/**
   - docs/milestones/closeout/M3.md
