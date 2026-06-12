@@ -6,8 +6,10 @@ import fnmatch
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -57,6 +59,14 @@ FUNCTIONAL_TEST_LEVELS = {"FT-L0", "FT-L1", "FT-L2", "FT-L3", "FT-L4"}
 GATE_ACCEPTED = "accepted"
 GATE_FAILED = "failed"
 GATE_INCONCLUSIVE = "inconclusive"
+GITHUB_EVIDENCE_FILES = {
+    "pr": "github-pr.yaml",
+    "ci": "github-ci.yaml",
+    "reviews": "github-reviews.yaml",
+    "branch_protection": "github-branch-protection.yaml",
+}
+TOKEN_KEY_RE = re.compile(r"(token|authorization|cookie|password|secret)", re.IGNORECASE)
+TOKEN_VALUE_RE = re.compile(r"(gh[pousr]_[A-Za-z0-9_]+|github_pat_[A-Za-z0-9_]+|Bearer\s+[A-Za-z0-9._-]+)")
 PROMPT_ROLES = {
     "orchestrator",
     "builder",
@@ -202,6 +212,20 @@ def find_task(task_id: str, milestone: Path = DEFAULT_MILESTONE) -> tuple[dict[s
     return None, [{"code": "task_not_found", "task_id": task_id, "message": f"{task_id} not found in {rel(milestone)}."}]
 
 
+def resolve_milestone(value: str | None, task_id: str | None = None) -> Path:
+    if value and re.fullmatch(r"M\d+", value):
+        return (ROOT / f"docs/milestones/{value}.md").resolve()
+    if (
+        task_id
+        and (value is None or Path(value).resolve() == DEFAULT_MILESTONE)
+        and (match := re.match(r"(M\d+)-", task_id))
+    ):
+        candidate = ROOT / f"docs/milestones/{match.group(1)}.md"
+        if candidate.exists():
+            return candidate.resolve()
+    return Path(value or DEFAULT_MILESTONE).resolve()
+
+
 def matches(pattern: str, path: str) -> bool:
     pattern = pattern.strip("/")
     path = path.strip("/")
@@ -337,6 +361,22 @@ def read_evidence(task_id: str, filename: str) -> tuple[dict[str, Any] | None, d
     if data.get("task_id") != task_id:
         return None, {"code": "evidence_task_id_mismatch", "path": rel(path), "message": f"Evidence task_id must be {task_id}."}
     return data, None
+
+
+def scrub_secret_values(value: Any) -> Any:
+    if isinstance(value, dict):
+        scrubbed: dict[str, Any] = {}
+        for key, item in value.items():
+            if TOKEN_KEY_RE.search(str(key)):
+                scrubbed[key] = "[REDACTED]"
+            else:
+                scrubbed[key] = scrub_secret_values(item)
+        return scrubbed
+    if isinstance(value, list):
+        return [scrub_secret_values(item) for item in value]
+    if isinstance(value, str):
+        return TOKEN_VALUE_RE.sub("[REDACTED]", value)
+    return value
 
 
 def evidence_dir(task_id: str) -> Path:
@@ -483,6 +523,401 @@ def check_blockers(task: dict[str, Any]) -> tuple[str, list[dict[str, Any]]]:
     return "pass", []
 
 
+def utc_now() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def github_collection(mode: str, network: bool, source: str) -> dict[str, Any]:
+    return {"mode": mode, "network": network, "source": source}
+
+
+def github_conclusion(value: Any) -> str:
+    normalized = str(value or "").lower()
+    if normalized in {"pass", "success", "successful", "accepted"}:
+        return "pass"
+    if normalized in {"fail", "failed", "failure", "cancel", "cancelled", "canceled", "timed_out", "action_required", "error"}:
+        return "fail"
+    if normalized in {"inconclusive", "pending", "queued", "in_progress", "unknown", "neutral", "skipped", "skipping"}:
+        return "skipped" if normalized == "skipping" else normalized if normalized in {"neutral", "skipped"} else GATE_INCONCLUSIVE
+    return GATE_INCONCLUSIVE
+
+
+def normalize_github_fixture(task_id: str, raw: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    raw = scrub_secret_values(raw)
+    evidence: dict[str, dict[str, Any]] = {}
+    collection = raw.get("collection")
+    if not isinstance(collection, dict):
+        collection = github_collection("fixture", False, "from-json")
+
+    if isinstance(raw.get("github_pr"), dict):
+        pr = dict(raw["github_pr"])
+        pr.setdefault("queried_at", utc_now())
+        pr.setdefault("conclusion", "pass")
+        evidence["github-pr.yaml"] = {
+            "schema_version": 1,
+            "task_id": task_id,
+            "source": "github",
+            "collection": collection,
+            "github_pr": pr,
+        }
+
+    if isinstance(raw.get("github_ci"), dict):
+        ci = dict(raw["github_ci"])
+        ci.setdefault("conclusion", infer_ci_conclusion(ci))
+        evidence["github-ci.yaml"] = {
+            "schema_version": 1,
+            "task_id": task_id,
+            "source": "github",
+            "collection": collection,
+            "github_ci": ci,
+        }
+
+    if isinstance(raw.get("github_reviews"), dict):
+        reviews = dict(raw["github_reviews"])
+        reviews.setdefault("conclusion", infer_review_conclusion(reviews))
+        evidence["github-reviews.yaml"] = {
+            "schema_version": 1,
+            "task_id": task_id,
+            "source": "github",
+            "collection": collection,
+            "github_reviews": reviews,
+        }
+
+    if isinstance(raw.get("github_branch_protection"), dict):
+        protection = dict(raw["github_branch_protection"])
+        protection.setdefault("conclusion", "pass" if protection.get("source_available") else GATE_INCONCLUSIVE)
+        evidence["github-branch-protection.yaml"] = {
+            "schema_version": 1,
+            "task_id": task_id,
+            "source": "github",
+            "collection": collection,
+            "github_branch_protection": protection,
+        }
+    return evidence
+
+
+def infer_ci_conclusion(ci: dict[str, Any]) -> str:
+    explicit = ci.get("conclusion")
+    if explicit:
+        conclusion = github_conclusion(explicit)
+        if conclusion == "fail":
+            return "fail"
+        if conclusion == "pass":
+            return "pass"
+        if conclusion == GATE_INCONCLUSIVE:
+            return GATE_INCONCLUSIVE
+    checks: list[dict[str, Any]] = []
+    for key in ["workflow_runs", "check_runs", "status_checks"]:
+        value = ci.get(key, [])
+        if isinstance(value, list):
+            checks.extend(item for item in value if isinstance(item, dict))
+    if not checks:
+        return GATE_INCONCLUSIVE
+    has_pending = False
+    for check in checks:
+        status = str(check.get("status", "")).lower()
+        conclusion = github_conclusion(check.get("conclusion") or check.get("state"))
+        if conclusion == "fail":
+            return "fail"
+        if status and status not in {"completed", "success"}:
+            has_pending = True
+        elif conclusion == GATE_INCONCLUSIVE:
+            has_pending = True
+    return GATE_INCONCLUSIVE if has_pending else "pass"
+
+
+def infer_review_conclusion(reviews: dict[str, Any]) -> str:
+    blocking = reviews.get("open_blocking_reviews", [])
+    if isinstance(blocking, list) and blocking:
+        return "fail"
+    for review in reviews.get("reviews", []) if isinstance(reviews.get("reviews"), list) else []:
+        if isinstance(review, dict) and str(review.get("state", "")).upper() == "CHANGES_REQUESTED":
+            return "fail"
+    return "pass"
+
+
+def load_github_fixture(path: Path, task_id: str) -> tuple[dict[str, dict[str, Any]] | None, list[dict[str, Any]]]:
+    if not path.exists():
+        return None, [{"code": "missing_github_fixture", "path": str(path), "message": "Fixture JSON does not exist."}]
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        return None, [{"code": "invalid_github_fixture_json", "path": str(path), "message": str(exc)}]
+    if not isinstance(raw, dict):
+        return None, [{"code": "invalid_github_fixture", "path": str(path), "message": "Fixture must be a JSON object."}]
+    evidence = normalize_github_fixture(task_id, raw)
+    if not evidence:
+        return None, [{"code": "empty_github_fixture", "path": str(path), "message": "Fixture did not contain recognized GitHub evidence sections."}]
+    return evidence, []
+
+
+def run_gh_json(args: list[str]) -> tuple[dict[str, Any] | list[Any] | None, dict[str, Any] | None]:
+    if not shutil.which("gh"):
+        return None, {"code": "gh_cli_unavailable", "message": "gh CLI is not available."}
+    try:
+        completed = subprocess.run(["gh", *args], cwd=ROOT, text=True, capture_output=True, check=False)
+    except OSError as exc:
+        return None, {"code": "gh_cli_unavailable", "message": str(exc)}
+    if completed.returncode != 0:
+        stderr = completed.stderr or completed.stdout or ""
+        code = "github_auth_unavailable" if "auth" in stderr.lower() or "login" in stderr.lower() else "github_read_failed"
+        return None, {"code": code, "message": f"gh command failed with exit code {completed.returncode}."}
+    try:
+        return json.loads(completed.stdout or "{}"), None
+    except json.JSONDecodeError as exc:
+        return None, {"code": "invalid_gh_json", "message": str(exc)}
+
+
+def load_live_github_evidence(task_id: str, repo: str, pr_number: str) -> tuple[dict[str, dict[str, Any]] | None, list[dict[str, Any]]]:
+    collection = github_collection("gh", True, "gh-cli")
+    pr_payload, pr_error = run_gh_json([
+        "pr",
+        "view",
+        pr_number,
+        "--repo",
+        repo,
+        "--json",
+        "number,url,state,isDraft,baseRefName,headRefName,baseRefOid,headRefOid,mergeable,reviews",
+    ])
+    if pr_error:
+        return None, [pr_error]
+    if not isinstance(pr_payload, dict):
+        return None, [{"code": "invalid_github_pr_payload", "message": "gh pr view returned an unexpected payload."}]
+    pr = {
+        "repo": repo,
+        "pr_number": pr_payload.get("number"),
+        "pr_url": pr_payload.get("url"),
+        "state": str(pr_payload.get("state", "")).lower(),
+        "draft": bool(pr_payload.get("isDraft")),
+        "base_branch": pr_payload.get("baseRefName"),
+        "head_branch": pr_payload.get("headRefName"),
+        "base_sha": pr_payload.get("baseRefOid"),
+        "head_sha": pr_payload.get("headRefOid"),
+        "mergeable_state": pr_payload.get("mergeable"),
+        "queried_at": utc_now(),
+        "conclusion": GATE_INCONCLUSIVE if pr_payload.get("isDraft") else "pass",
+    }
+    evidence = {
+        "github-pr.yaml": {
+            "schema_version": 1,
+            "task_id": task_id,
+            "source": "github",
+            "collection": collection,
+            "github_pr": scrub_secret_values(pr),
+        }
+    }
+
+    checks_payload, checks_error = run_gh_json(["pr", "checks", pr_number, "--repo", repo, "--json", "name,state,bucket,link,workflow"])
+    if checks_error is None and isinstance(checks_payload, list):
+        check_runs = [
+            {
+                "name": item.get("name"),
+                "status": item.get("state"),
+                "conclusion": item.get("bucket"),
+                "url": item.get("link"),
+                "workflow": item.get("workflow"),
+            }
+            for item in checks_payload
+            if isinstance(item, dict)
+        ]
+        ci = {
+            "repo": repo,
+            "head_sha": pr.get("head_sha"),
+            "required_checks_known": False,
+            "workflow_runs": [],
+            "check_runs": check_runs,
+            "status_checks": [],
+        }
+        ci["conclusion"] = infer_ci_conclusion(ci)
+        evidence["github-ci.yaml"] = {
+            "schema_version": 1,
+            "task_id": task_id,
+            "source": "github",
+            "collection": collection,
+            "github_ci": scrub_secret_values(ci),
+        }
+
+    reviews_payload = pr_payload.get("reviews", [])
+    if isinstance(reviews_payload, list):
+        reviews = {
+            "repo": repo,
+            "pr_number": pr_payload.get("number"),
+            "reviews": [
+                {
+                    "reviewer": (item.get("author") or {}).get("login") if isinstance(item.get("author"), dict) else item.get("author"),
+                    "state": item.get("state"),
+                    "commit_id": item.get("commit", {}).get("oid") if isinstance(item.get("commit"), dict) else item.get("commit_id"),
+                    "submitted_at": item.get("submittedAt") or item.get("submitted_at"),
+                }
+                for item in reviews_payload
+                if isinstance(item, dict)
+            ],
+            "open_blocking_reviews": [
+                item for item in reviews_payload if isinstance(item, dict) and str(item.get("state", "")).upper() == "CHANGES_REQUESTED"
+            ],
+        }
+        reviews["conclusion"] = infer_review_conclusion(reviews)
+        evidence["github-reviews.yaml"] = {
+            "schema_version": 1,
+            "task_id": task_id,
+            "source": "github",
+            "collection": collection,
+            "github_reviews": scrub_secret_values(reviews),
+        }
+    return evidence, []
+
+
+def logical_evidence_path(task_id: str, filename: str) -> str:
+    return f"docs/milestones/evidence/{task_id}/{filename}"
+
+
+def github_evidence_payload(task: dict[str, Any], args: argparse.Namespace) -> dict[str, Any]:
+    task_id = task["task_id"]
+    reasons: list[dict[str, Any]] = []
+    evidence: dict[str, dict[str, Any]] | None = None
+    live = False
+    if args.from_json:
+        evidence, reasons = load_github_fixture(Path(args.from_json), task_id)
+    else:
+        if not args.repo or not args.pr:
+            reasons = [{"code": "missing_github_input", "message": "Provide --from-json or both --repo and --pr."}]
+        else:
+            live = True
+            evidence, reasons = load_live_github_evidence(task_id, args.repo, str(args.pr))
+    if reasons:
+        return {"result": GATE_INCONCLUSIVE, "task_id": task_id, "dry_run": not args.write_evidence or args.dry_run, "live": live, "files": [], "reasons": reasons}
+    assert evidence is not None
+    managed = task.get("managed_artifact_paths", [])
+    files = []
+    for filename, content in evidence.items():
+        logical_path = logical_evidence_path(task_id, filename)
+        if not any_match(managed, logical_path):
+            reasons.append({"code": "outside_managed_artifact_paths", "path": logical_path, "message": "GitHub evidence file is outside managed_artifact_paths."})
+            continue
+        action = "would_write" if args.dry_run or not args.write_evidence else "written"
+        if args.write_evidence and not args.dry_run:
+            out_dir = evidence_dir(task_id)
+            out_dir.mkdir(parents=True, exist_ok=True)
+            (out_dir / filename).write_text(yaml.safe_dump(content, sort_keys=False), encoding="utf-8")
+        files.append({"path": logical_path, "action": action})
+    return {"result": "fail" if reasons else "pass", "task_id": task_id, "dry_run": args.dry_run or not args.write_evidence, "live": live, "files": files, "reasons": reasons}
+
+
+def required_github_evidence(task: dict[str, Any]) -> list[str]:
+    value = task.get("required_github_evidence")
+    if isinstance(value, list):
+        return [str(item) for item in value]
+    github = task.get("github_evidence")
+    if isinstance(github, dict) and isinstance(github.get("required"), list):
+        return [str(item) for item in github["required"]]
+    return []
+
+
+def task_evidence_head_sha(task_id: str) -> tuple[str | None, dict[str, Any] | None]:
+    data, error = read_evidence(task_id, "path-policy.yaml")
+    if error:
+        return None, error
+    source = data.get("source")
+    if not isinstance(source, dict):
+        return None, {"code": "missing_path_policy_source", "message": "path-policy.yaml must include source for SHA consistency."}
+    head = source.get("head_sha") or source.get("head")
+    return str(head) if head else None, None
+
+
+def check_github_evidence(task: dict[str, Any]) -> tuple[str, list[dict[str, Any]]]:
+    required = required_github_evidence(task)
+    if not required:
+        return "pass", []
+    task_id = task["task_id"]
+    reasons: list[dict[str, Any]] = []
+    result = "pass"
+    loaded: dict[str, dict[str, Any]] = {}
+    for item in required:
+        filename = GITHUB_EVIDENCE_FILES.get(item)
+        if not filename:
+            reasons.append({"code": "unknown_required_github_evidence", "message": f"Unknown GitHub evidence requirement: {item}"})
+            result = GATE_INCONCLUSIVE
+            continue
+        data, error = read_evidence(task_id, filename)
+        if error:
+            reasons.append({"code": f"missing_github_{item}_evidence", "message": f"{filename} is required.", "path": rel(evidence_dir(task_id) / filename)})
+            result = GATE_INCONCLUSIVE
+            continue
+        if data.get("source") != "github":
+            reasons.append({"code": "invalid_github_evidence_source", "message": f"{filename} must include source: github.", "path": rel(evidence_dir(task_id) / filename)})
+            result = GATE_INCONCLUSIVE
+            continue
+        loaded[item] = data
+
+    pr_head = None
+    if "pr" in loaded:
+        pr = loaded["pr"].get("github_pr", {})
+        if not isinstance(pr, dict):
+            reasons.append({"code": "invalid_github_pr_evidence", "message": "github-pr.yaml must include github_pr mapping."})
+            result = GATE_INCONCLUSIVE
+        else:
+            pr_head = pr.get("head_sha")
+            if not pr.get("repo") or not pr.get("pr_number") or not pr.get("pr_url") or not pr_head:
+                reasons.append({"code": "missing_github_pr_fields", "message": "PR evidence is missing repo, pr_number, pr_url, or head_sha."})
+                result = GATE_INCONCLUSIVE
+            if pr.get("draft"):
+                reasons.append({"code": "github_pr_draft", "message": "PR is draft."})
+                result = GATE_INCONCLUSIVE
+            state = str(pr.get("state", "")).lower()
+            if state == "closed" and not pr.get("merged", False):
+                reasons.append({"code": "github_pr_closed_unmerged", "message": "PR is closed without merge."})
+                result = GATE_FAILED
+
+    if "ci" in loaded:
+        ci = loaded["ci"].get("github_ci", {})
+        if not isinstance(ci, dict):
+            reasons.append({"code": "invalid_github_ci_evidence", "message": "github-ci.yaml must include github_ci mapping."})
+            result = GATE_INCONCLUSIVE
+        else:
+            ci_head = ci.get("head_sha")
+            if pr_head and ci_head and str(ci_head) != str(pr_head):
+                reasons.append({"code": "github_ci_head_sha_mismatch", "message": "CI head_sha does not match PR head_sha."})
+                result = GATE_FAILED
+            conclusion = infer_ci_conclusion(ci)
+            if conclusion == "fail":
+                reasons.append({"code": "github_ci_failed", "message": "Required GitHub CI/check evidence failed."})
+                result = GATE_FAILED
+            elif conclusion == GATE_INCONCLUSIVE:
+                reasons.append({"code": "github_ci_inconclusive", "message": "GitHub CI/check evidence is pending, missing, or unknown."})
+                if result != GATE_FAILED:
+                    result = GATE_INCONCLUSIVE
+
+    if "reviews" in loaded:
+        reviews = loaded["reviews"].get("github_reviews", {})
+        if not isinstance(reviews, dict):
+            reasons.append({"code": "invalid_github_reviews_evidence", "message": "github-reviews.yaml must include github_reviews mapping."})
+            result = GATE_INCONCLUSIVE
+        else:
+            conclusion = infer_review_conclusion(reviews)
+            if conclusion == "fail":
+                reasons.append({"code": "github_reviews_blocking", "message": "Open blocking PR review exists."})
+                result = GATE_FAILED
+
+    if "branch_protection" in loaded:
+        protection = loaded["branch_protection"].get("github_branch_protection", {})
+        if not isinstance(protection, dict) or not protection.get("source_available"):
+            reasons.append({"code": "github_branch_protection_unavailable", "message": "Branch protection evidence is unavailable."})
+            if result != GATE_FAILED:
+                result = GATE_INCONCLUSIVE
+
+    require_sha = bool(task.get("github_sha_consistency_required")) or ("pr" in loaded and "ci" in loaded)
+    if require_sha and pr_head:
+        task_head, head_error = task_evidence_head_sha(task_id)
+        if head_error or not task_head:
+            reasons.append({"code": "task_head_sha_unavailable", "message": "Task evidence head_sha is unavailable for GitHub SHA consistency."})
+            if result != GATE_FAILED:
+                result = GATE_INCONCLUSIVE
+        elif str(task_head) != str(pr_head):
+            reasons.append({"code": "github_pr_head_sha_mismatch", "message": "PR head_sha does not match task evidence head_sha."})
+            result = GATE_FAILED
+    return result, reasons
+
+
 def gate_payload(task: dict[str, Any]) -> dict[str, Any]:
     checks = {
         "path_policy": check_path_policy(task),
@@ -490,6 +925,7 @@ def gate_payload(task: dict[str, Any]) -> dict[str, Any]:
         "reviewer": check_reviewer(task),
         "functional_test": check_functional(task),
         "blockers": check_blockers(task),
+        "github_evidence": check_github_evidence(task),
     }
     reasons: list[dict[str, Any]] = []
     result = GATE_ACCEPTED
@@ -505,7 +941,7 @@ def gate_payload(task: dict[str, Any]) -> dict[str, Any]:
 
 
 def command_validate(args: argparse.Namespace) -> int:
-    path = Path(args.milestone).resolve()
+    path = resolve_milestone(args.milestone)
     tasks, errors = load_validated_tasks(path)
     payload = {
         "result": "invalid" if errors else "valid",
@@ -517,7 +953,7 @@ def command_validate(args: argparse.Namespace) -> int:
 
 
 def command_diff_check(args: argparse.Namespace) -> int:
-    task, errors = find_task(args.task, Path(args.milestone).resolve())
+    task, errors = find_task(args.task, resolve_milestone(args.milestone, args.task))
     if errors or task is None:
         return emit({"result": GATE_INCONCLUSIVE, "task_id": args.task, "reasons": errors}, args.json)
     try:
@@ -563,7 +999,7 @@ def task_info_payload(task: dict[str, Any], milestone: Path) -> dict[str, Any]:
 
 
 def command_task_info(args: argparse.Namespace) -> int:
-    milestone = Path(args.milestone).resolve()
+    milestone = resolve_milestone(args.milestone, args.task)
     task, errors = find_task(args.task, milestone)
     if errors or task is None:
         return emit({"result": GATE_INCONCLUSIVE, "task_id": args.task, "reasons": errors}, args.json)
@@ -660,7 +1096,7 @@ def evidence_init_payload(task: dict[str, Any], dry_run: bool, force: bool) -> d
 
 
 def command_evidence_init(args: argparse.Namespace) -> int:
-    task, errors = find_task(args.task, Path(args.milestone).resolve())
+    task, errors = find_task(args.task, resolve_milestone(args.milestone, args.task))
     if errors or task is None:
         return emit({"result": GATE_INCONCLUSIVE, "task_id": args.task, "reasons": errors}, args.json)
     payload = evidence_init_payload(task, args.dry_run, args.force)
@@ -717,7 +1153,7 @@ Phase 2 non-goals:
 
 
 def command_prompt_pack(args: argparse.Namespace) -> int:
-    milestone = Path(args.milestone).resolve()
+    milestone = resolve_milestone(args.milestone, args.task)
     task, errors = find_task(args.task, milestone)
     if errors or task is None:
         return emit({"result": GATE_INCONCLUSIVE, "task_id": args.task, "reasons": errors}, args.json)
@@ -729,8 +1165,23 @@ def command_prompt_pack(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_github_evidence(args: argparse.Namespace) -> int:
+    task, errors = find_task(args.task, resolve_milestone(args.milestone, args.task))
+    if errors or task is None:
+        return emit({"result": GATE_INCONCLUSIVE, "task_id": args.task, "reasons": errors}, args.json)
+    payload = github_evidence_payload(task, args)
+    if args.json:
+        return emit(payload, True)
+    print(payload["result"])
+    for item in payload.get("files", []):
+        print(f"- {item['action']}: {item['path']}")
+    for reason in payload.get("reasons", []):
+        print(f"- {reason.get('code')}: {reason.get('message')}")
+    return result_exit(payload["result"])
+
+
 def command_gate(args: argparse.Namespace) -> int:
-    task, errors = find_task(args.task, Path(args.milestone).resolve())
+    task, errors = find_task(args.task, resolve_milestone(args.milestone, args.task))
     if errors or task is None:
         return emit({"result": GATE_INCONCLUSIVE, "task_id": args.task, "reasons": errors}, args.json)
     payload = gate_payload(task)
@@ -795,6 +1246,44 @@ def summarize_evidence(task: dict[str, Any]) -> tuple[list[str], list[str]]:
     return evidence_lines, changed_files
 
 
+def summarize_github_evidence(task_id: str) -> list[str]:
+    lines: list[str] = []
+    pr_data, _ = read_evidence(task_id, "github-pr.yaml")
+    if pr_data and isinstance(pr_data.get("github_pr"), dict):
+        pr = pr_data["github_pr"]
+        if pr.get("pr_url"):
+            lines.append(f"- PR: {pr.get('pr_url')}")
+        if pr.get("state"):
+            lines.append(f"- PR state: {pr.get('state')}")
+        if pr.get("head_sha"):
+            lines.append(f"- PR head_sha: {pr.get('head_sha')}")
+    ci_data, _ = read_evidence(task_id, "github-ci.yaml")
+    if ci_data and isinstance(ci_data.get("github_ci"), dict):
+        ci = ci_data["github_ci"]
+        lines.append(f"- CI conclusion: {ci.get('conclusion', infer_ci_conclusion(ci))}")
+        checks = []
+        for key in ["workflow_runs", "check_runs", "status_checks"]:
+            value = ci.get(key, [])
+            if isinstance(value, list):
+                checks.extend(item for item in value if isinstance(item, dict))
+        for check in checks[:5]:
+            name = check.get("name") or check.get("workflow") or "check"
+            conclusion = check.get("conclusion") or check.get("status") or check.get("state") or "unknown"
+            lines.append(f"- Check: {name} = {conclusion}")
+    review_data, _ = read_evidence(task_id, "github-reviews.yaml")
+    if review_data and isinstance(review_data.get("github_reviews"), dict):
+        reviews = review_data["github_reviews"]
+        review_items = reviews.get("reviews", [])
+        count = len(review_items) if isinstance(review_items, list) else 0
+        lines.append(f"- Review conclusion: {reviews.get('conclusion', infer_review_conclusion(reviews))}")
+        lines.append(f"- Reviews recorded: {count}")
+    protection_data, _ = read_evidence(task_id, "github-branch-protection.yaml")
+    if protection_data and isinstance(protection_data.get("github_branch_protection"), dict):
+        protection = protection_data["github_branch_protection"]
+        lines.append(f"- Branch protection available: {bool(protection.get('source_available'))}")
+    return lines
+
+
 def closeout_block(task: dict[str, Any], gate: dict[str, Any], milestone: Path = DEFAULT_MILESTONE) -> str:
     task_id = task["task_id"]
     status = gate["result"]
@@ -803,6 +1292,7 @@ def closeout_block(task: dict[str, Any], gate: dict[str, Any], milestone: Path =
     evidence_lines, changed_files = summarize_evidence(task)
     changed_file_lines = "\n".join(f"- {path}" for path in changed_files) or "- none"
     evidence_summary = "\n".join(evidence_lines) or "- none"
+    github_summary = "\n".join(summarize_github_evidence(task_id)) or "- none"
     branch = current_branch() or "unknown"
     source_lines = "- none"
     path_policy, _ = read_evidence(task_id, "path-policy.yaml")
@@ -853,6 +1343,10 @@ Evidence summary:
 
 {evidence_summary}
 
+GitHub evidence:
+
+{github_summary}
+
 Known risks:
 
 {risk_lines}
@@ -878,7 +1372,7 @@ def upsert_block(text: str, task_id: str, block: str) -> str:
 
 
 def command_closeout(args: argparse.Namespace) -> int:
-    milestone = Path(args.milestone).resolve()
+    milestone = resolve_milestone(args.milestone, args.task)
     tasks, errors = load_validated_tasks(milestone)
     if errors:
         return emit({"result": GATE_INCONCLUSIVE, "reasons": errors}, args.json)
@@ -947,6 +1441,17 @@ def build_parser() -> argparse.ArgumentParser:
     prompt_pack.add_argument("--milestone", default=str(DEFAULT_MILESTONE))
     prompt_pack.add_argument("--json", action="store_true")
     prompt_pack.set_defaults(func=command_prompt_pack)
+
+    github_evidence = sub.add_parser("github-evidence")
+    github_evidence.add_argument("--task", required=True)
+    github_evidence.add_argument("--milestone", default=str(DEFAULT_MILESTONE))
+    github_evidence.add_argument("--repo")
+    github_evidence.add_argument("--pr")
+    github_evidence.add_argument("--from-json")
+    github_evidence.add_argument("--write-evidence", action="store_true")
+    github_evidence.add_argument("--dry-run", action="store_true")
+    github_evidence.add_argument("--json", action="store_true")
+    github_evidence.set_defaults(func=command_github_evidence)
 
     gate = sub.add_parser("gate")
     gate.add_argument("--task", required=True)

@@ -1,0 +1,15 @@
+schema_version: 1
+task_id: M3-T09
+blockers:
+  - severity: P1
+    status: open
+    code: no_safe_pr_available
+    issue: "No real PR or safe test PR is available in Notyet1307/Coshare."
+    evidence:
+      - command: "gh pr list --repo Notyet1307/Coshare --limit 10 --json number,title,state,isDraft,headRefName,headRefOid,baseRefName,url"
+        exit_code: 0
+        stdout_excerpt: "[]"
+      - command: "gh pr list --repo Notyet1307/Coshare --state all --limit 20 --json number,title,state,isDraft,headRefName,headRefOid,baseRefName,url"
+        exit_code: 0
+        stdout_excerpt: "[]"
+    required_action: "Provide an existing safe PR number, or explicitly approve a separate human-driven safe test PR workflow outside Bridge automation."

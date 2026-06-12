@@ -62,6 +62,58 @@ def write_path_policy(evidence_dir: Path):
     )
 
 
+def write_github_pr(evidence_dir: Path, head_sha: str = "head-sha"):
+    (evidence_dir / "github-pr.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": 1,
+                "task_id": "FX-T01",
+                "source": "github",
+                "collection": {"mode": "fixture", "network": False, "source": "from-json"},
+                "github_pr": {
+                    "repo": "Notyet1307/Coshare",
+                    "pr_number": 1,
+                    "pr_url": "https://github.com/Notyet1307/Coshare/pull/1",
+                    "state": "open",
+                    "draft": False,
+                    "base_branch": "main",
+                    "head_branch": "phase-3-fixture",
+                    "base_sha": "base-sha",
+                    "head_sha": head_sha,
+                    "mergeable_state": "clean",
+                    "queried_at": "2026-06-12T00:00:00Z",
+                    "conclusion": "pass",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def write_github_ci(evidence_dir: Path, conclusion: str = "pass", head_sha: str = "head-sha"):
+    check_conclusion = "failure" if conclusion in {"fail", "failed", "failure"} else "success"
+    (evidence_dir / "github-ci.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": 1,
+                "task_id": "FX-T01",
+                "source": "github",
+                "collection": {"mode": "fixture", "network": False, "source": "from-json"},
+                "github_ci": {
+                    "repo": "Notyet1307/Coshare",
+                    "head_sha": head_sha,
+                    "required_checks_known": True,
+                    "workflow_runs": [{"name": "tests", "status": "completed", "conclusion": check_conclusion}],
+                    "check_runs": [{"name": "tests", "status": "completed", "conclusion": check_conclusion}],
+                    "status_checks": [],
+                    "conclusion": conclusion,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
 class AgentBridgeTests(unittest.TestCase):
     def setUp(self):
         self.old_changed_paths = agent_bridge.changed_paths
@@ -618,6 +670,10 @@ class AgentBridgeTests(unittest.TestCase):
         self.assertIn("production secret handling", prompt)
         self.assertIn("VPN/internal network automation", prompt)
 
+    def test_resolve_milestone_supports_task_prefix_and_shorthand(self):
+        self.assertEqual(agent_bridge.resolve_milestone("M3"), (agent_bridge.ROOT / "docs/milestones/M3.md").resolve())
+        self.assertEqual(agent_bridge.resolve_milestone(str(agent_bridge.DEFAULT_MILESTONE), "M3-T01"), (agent_bridge.ROOT / "docs/milestones/M3.md").resolve())
+
     def test_closeout_resume_uses_selected_milestone(self):
         gate = {"result": "accepted", "checks": {"verifier": "pass"}, "reasons": []}
         milestone = FIXTURES / "valid_milestone.md"
@@ -695,6 +751,140 @@ class AgentBridgeTests(unittest.TestCase):
                 agent_bridge.changed_paths = old_changed_paths
         self.assertEqual(payload["result"], "inconclusive")
         self.assertEqual(payload["reasons"][0]["code"], "empty_git_range_path_policy")
+
+    def test_github_evidence_from_fixture_writes_pr_ci(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old_root = agent_bridge.EVIDENCE_ROOT
+            agent_bridge.EVIDENCE_ROOT = Path(tmp)
+            args = type(
+                "Args",
+                (),
+                {
+                    "from_json": str(FIXTURES / "github" / "pass.json"),
+                    "repo": None,
+                    "pr": None,
+                    "write_evidence": True,
+                    "dry_run": False,
+                },
+            )()
+            try:
+                payload = agent_bridge.github_evidence_payload(task(), args)
+                out_dir = Path(tmp) / "FX-T01"
+                ci = yaml.safe_load((out_dir / "github-ci.yaml").read_text(encoding="utf-8"))
+            finally:
+                agent_bridge.EVIDENCE_ROOT = old_root
+        self.assertEqual(payload["result"], "pass")
+        self.assertTrue(any(item["path"].endswith("github-pr.yaml") for item in payload["files"]))
+        self.assertEqual(ci["github_ci"]["conclusion"], "pass")
+
+    def test_github_fixture_normalization_redacts_token_like_values(self):
+        evidence = agent_bridge.normalize_github_fixture(
+            "FX-T01",
+            {
+                "token": "ghp_runtime_only_value",
+                "github_pr": {
+                    "repo": "Notyet1307/Coshare",
+                    "pr_number": 1,
+                    "pr_url": "https://github.com/Notyet1307/Coshare/pull/1",
+                    "state": "open",
+                    "draft": False,
+                    "base_branch": "main",
+                    "head_branch": "phase-3-fixture",
+                    "base_sha": "base-sha",
+                    "head_sha": "head-sha",
+                    "queried_at": "2026-06-12T00:00:00Z",
+                },
+            },
+        )
+        text = yaml.safe_dump(evidence, sort_keys=False)
+        self.assertNotIn("ghp_runtime_only_value", text)
+
+    def test_github_check_bucket_values_are_normalized(self):
+        self.assertEqual(agent_bridge.github_conclusion("pass"), "pass")
+        self.assertEqual(agent_bridge.github_conclusion("fail"), "fail")
+        self.assertEqual(agent_bridge.github_conclusion("cancel"), "fail")
+        self.assertEqual(agent_bridge.github_conclusion("pending"), "inconclusive")
+        self.assertEqual(agent_bridge.github_conclusion("skipping"), "skipped")
+
+    def test_github_evidence_missing_required_pr_is_inconclusive(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old_root = agent_bridge.EVIDENCE_ROOT
+            agent_bridge.EVIDENCE_ROOT = Path(tmp)
+            evidence_dir = Path(tmp) / "FX-T01"
+            evidence_dir.mkdir()
+            write_path_policy(evidence_dir)
+            try:
+                payload = agent_bridge.gate_payload(task(required_github_evidence=["pr"]))
+            finally:
+                agent_bridge.EVIDENCE_ROOT = old_root
+        self.assertEqual(payload["result"], "inconclusive")
+        self.assertIn("missing_github_pr_evidence", {reason["code"] for reason in payload["reasons"]})
+
+    def test_github_ci_failure_fails_gate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old_root = agent_bridge.EVIDENCE_ROOT
+            agent_bridge.EVIDENCE_ROOT = Path(tmp)
+            evidence_dir = Path(tmp) / "FX-T01"
+            evidence_dir.mkdir()
+            write_path_policy(evidence_dir)
+            write_github_ci(evidence_dir, conclusion="fail")
+            try:
+                payload = agent_bridge.gate_payload(task(required_github_evidence=["ci"]))
+            finally:
+                agent_bridge.EVIDENCE_ROOT = old_root
+        self.assertEqual(payload["result"], "failed")
+        self.assertIn("github_ci_failed", {reason["code"] for reason in payload["reasons"]})
+
+    def test_github_pr_head_sha_mismatch_fails_gate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old_root = agent_bridge.EVIDENCE_ROOT
+            old_commit_exists = agent_bridge.git_commit_exists
+            old_changed_paths = agent_bridge.changed_paths
+            agent_bridge.EVIDENCE_ROOT = Path(tmp)
+            agent_bridge.git_commit_exists = lambda ref: ref in {"base-sha", "task-head-sha"}
+            agent_bridge.changed_paths = lambda base, head, worktree: ["docs/readme.md"]
+            evidence_dir = Path(tmp) / "FX-T01"
+            evidence_dir.mkdir()
+            (evidence_dir / "path-policy.yaml").write_text(
+                yaml.safe_dump(
+                    {
+                        "schema_version": 1,
+                        "task_id": "FX-T01",
+                        "result": "pass",
+                        "source": {"mode": "git_range", "base_sha": "base-sha", "head_sha": "task-head-sha"},
+                        "changed_files": ["docs/readme.md"],
+                        "reasons": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            write_github_pr(evidence_dir, head_sha="github-head-sha")
+            try:
+                payload = agent_bridge.gate_payload(task(required_github_evidence=["pr"], github_sha_consistency_required=True))
+            finally:
+                agent_bridge.EVIDENCE_ROOT = old_root
+                agent_bridge.git_commit_exists = old_commit_exists
+                agent_bridge.changed_paths = old_changed_paths
+        self.assertEqual(payload["result"], "failed")
+        self.assertIn("github_pr_head_sha_mismatch", {reason["code"] for reason in payload["reasons"]})
+
+    def test_closeout_block_includes_github_evidence_summary(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old_root = agent_bridge.EVIDENCE_ROOT
+            agent_bridge.EVIDENCE_ROOT = Path(tmp)
+            evidence_dir = Path(tmp) / "FX-T01"
+            evidence_dir.mkdir()
+            write_path_policy(evidence_dir)
+            write_github_pr(evidence_dir)
+            write_github_ci(evidence_dir)
+            try:
+                gate = agent_bridge.gate_payload(task(required_github_evidence=["pr", "ci"]))
+                block = agent_bridge.closeout_block(task(required_github_evidence=["pr", "ci"]), gate, FIXTURES / "valid_milestone.md")
+            finally:
+                agent_bridge.EVIDENCE_ROOT = old_root
+        self.assertIn("GitHub evidence:", block)
+        self.assertIn("https://github.com/Notyet1307/Coshare/pull/1", block)
+        self.assertIn("CI conclusion: pass", block)
 
 
 if __name__ == "__main__":

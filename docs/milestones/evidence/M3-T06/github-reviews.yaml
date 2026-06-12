@@ -1,0 +1,17 @@
+schema_version: 1
+task_id: M3-T06
+source: github
+collection:
+  mode: fixture
+  network: false
+  source: from-json
+github_reviews:
+  repo: Notyet1307/Coshare
+  pr_number: 1
+  reviews:
+  - reviewer: reviewer
+    state: APPROVED
+    commit_id: head-sha
+    submitted_at: '2026-06-12T00:00:00Z'
+  open_blocking_reviews: []
+  conclusion: pass

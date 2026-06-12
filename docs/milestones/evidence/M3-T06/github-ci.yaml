@@ -1,0 +1,22 @@
+schema_version: 1
+task_id: M3-T06
+source: github
+collection:
+  mode: fixture
+  network: false
+  source: from-json
+github_ci:
+  repo: Notyet1307/Coshare
+  head_sha: head-sha
+  required_checks_known: true
+  workflow_runs:
+  - name: tests
+    status: completed
+    conclusion: success
+    url: https://github.com/Notyet1307/Coshare/actions/runs/1
+  check_runs:
+  - name: tests
+    status: completed
+    conclusion: success
+  status_checks: []
+  conclusion: pass
