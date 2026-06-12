@@ -1,0 +1,107 @@
+schema_version: 1
+task_id: M2-T10
+verifier:
+  commands:
+  - command: tools/agent-bridge/agent-bridge validate docs/milestones/M2.md --json
+    exit_code: 0
+    stdout_excerpt: "{\n  \"milestone\": \"docs/milestones/M2.md\",\n  \"reasons\"\
+      : [],\n  \"result\": \"valid\",\n  \"tasks_checked\": 10\n}"
+    stderr_excerpt: ''
+  - command: python3 -B -m unittest discover -s tools/agent-bridge/tests -p test*.py
+    exit_code: 0
+    stdout_excerpt: ''
+    stderr_excerpt: '................................
+
+      ----------------------------------------------------------------------
+
+      Ran 32 tests in 0.141s
+
+
+      OK'
+  - command: tools/agent-bridge/agent-bridge gate --task M2-T01 --milestone docs/milestones/M2.md
+      --json
+    exit_code: 0
+    stdout_excerpt: "{\n  \"checks\": {\n    \"blockers\": \"pass\",\n    \"functional_test\"\
+      : \"pass\",\n    \"path_policy\": \"pass\",\n    \"reviewer\": \"pass\",\n \
+      \   \"verifier\": \"pass\"\n  },\n  \"reasons\": [],\n  \"result\": \"accepted\"\
+      ,\n  \"task_id\": \"M2-T01\"\n}"
+    stderr_excerpt: ''
+  - command: tools/agent-bridge/agent-bridge gate --task M2-T02 --milestone docs/milestones/M2.md
+      --json
+    exit_code: 0
+    stdout_excerpt: "{\n  \"checks\": {\n    \"blockers\": \"pass\",\n    \"functional_test\"\
+      : \"pass\",\n    \"path_policy\": \"pass\",\n    \"reviewer\": \"pass\",\n \
+      \   \"verifier\": \"pass\"\n  },\n  \"reasons\": [],\n  \"result\": \"accepted\"\
+      ,\n  \"task_id\": \"M2-T02\"\n}"
+    stderr_excerpt: ''
+  - command: tools/agent-bridge/agent-bridge gate --task M2-T03 --milestone docs/milestones/M2.md
+      --json
+    exit_code: 0
+    stdout_excerpt: "{\n  \"checks\": {\n    \"blockers\": \"pass\",\n    \"functional_test\"\
+      : \"pass\",\n    \"path_policy\": \"pass\",\n    \"reviewer\": \"pass\",\n \
+      \   \"verifier\": \"pass\"\n  },\n  \"reasons\": [],\n  \"result\": \"accepted\"\
+      ,\n  \"task_id\": \"M2-T03\"\n}"
+    stderr_excerpt: ''
+  - command: tools/agent-bridge/agent-bridge gate --task M2-T04 --milestone docs/milestones/M2.md
+      --json
+    exit_code: 0
+    stdout_excerpt: "{\n  \"checks\": {\n    \"blockers\": \"pass\",\n    \"functional_test\"\
+      : \"pass\",\n    \"path_policy\": \"pass\",\n    \"reviewer\": \"pass\",\n \
+      \   \"verifier\": \"pass\"\n  },\n  \"reasons\": [],\n  \"result\": \"accepted\"\
+      ,\n  \"task_id\": \"M2-T04\"\n}"
+    stderr_excerpt: ''
+  - command: tools/agent-bridge/agent-bridge gate --task M2-T05 --milestone docs/milestones/M2.md
+      --json
+    exit_code: 0
+    stdout_excerpt: "{\n  \"checks\": {\n    \"blockers\": \"pass\",\n    \"functional_test\"\
+      : \"pass\",\n    \"path_policy\": \"pass\",\n    \"reviewer\": \"pass\",\n \
+      \   \"verifier\": \"pass\"\n  },\n  \"reasons\": [],\n  \"result\": \"accepted\"\
+      ,\n  \"task_id\": \"M2-T05\"\n}"
+    stderr_excerpt: ''
+  - command: tools/agent-bridge/agent-bridge gate --task M2-T06 --milestone docs/milestones/M2.md
+      --json
+    exit_code: 0
+    stdout_excerpt: "{\n  \"checks\": {\n    \"blockers\": \"pass\",\n    \"functional_test\"\
+      : \"pass\",\n    \"path_policy\": \"pass\",\n    \"reviewer\": \"pass\",\n \
+      \   \"verifier\": \"pass\"\n  },\n  \"reasons\": [],\n  \"result\": \"accepted\"\
+      ,\n  \"task_id\": \"M2-T06\"\n}"
+    stderr_excerpt: ''
+  - command: tools/agent-bridge/agent-bridge gate --task M2-T07 --milestone docs/milestones/M2.md
+      --json
+    exit_code: 0
+    stdout_excerpt: "{\n  \"checks\": {\n    \"blockers\": \"pass\",\n    \"functional_test\"\
+      : \"pass\",\n    \"path_policy\": \"pass\",\n    \"reviewer\": \"pass\",\n \
+      \   \"verifier\": \"pass\"\n  },\n  \"reasons\": [],\n  \"result\": \"accepted\"\
+      ,\n  \"task_id\": \"M2-T07\"\n}"
+    stderr_excerpt: ''
+  - command: tools/agent-bridge/agent-bridge gate --task M2-T08 --milestone docs/milestones/M2.md
+      --json
+    exit_code: 0
+    stdout_excerpt: "{\n  \"checks\": {\n    \"blockers\": \"pass\",\n    \"functional_test\"\
+      : \"pass\",\n    \"path_policy\": \"pass\",\n    \"reviewer\": \"pass\",\n \
+      \   \"verifier\": \"pass\"\n  },\n  \"reasons\": [],\n  \"result\": \"accepted\"\
+      ,\n  \"task_id\": \"M2-T08\"\n}"
+    stderr_excerpt: ''
+  - command: tools/agent-bridge/agent-bridge gate --task M2-T09 --milestone docs/milestones/M2.md
+      --json
+    exit_code: 0
+    stdout_excerpt: "{\n  \"checks\": {\n    \"blockers\": \"pass\",\n    \"functional_test\"\
+      : \"pass\",\n    \"path_policy\": \"pass\",\n    \"reviewer\": \"pass\",\n \
+      \   \"verifier\": \"pass\"\n  },\n  \"reasons\": [],\n  \"result\": \"accepted\"\
+      ,\n  \"task_id\": \"M2-T09\"\n}"
+    stderr_excerpt: ''
+  - command: tools/agent-bridge/agent-bridge closeout --milestone docs/milestones/M2.md
+      --milestone-name M2 --dry-run --json
+    exit_code: 0
+    stdout_excerpt: "{\n  \"closeout\": \"docs/milestones/closeout/M2.md\",\n  \"\
+      dry_run\": true,\n  \"reasons\": [],\n  \"result\": \"pass\",\n  \"tasks\":\
+      \ [\n    {\n      \"result\": \"accepted\",\n      \"task_id\": \"M2-T01\"\n\
+      \    },\n    {\n      \"result\": \"accepted\",\n      \"task_id\": \"M2-T02\"\
+      \n    },\n    {\n "
+    stderr_excerpt: ''
+  environment:
+    repo: /Users/yang/Coshare
+    branch: main
+    source_mode: worktree_pending_stabilization
+    head_before_evidence: 626971b
+  conclusion: pass
