@@ -10,11 +10,11 @@ verifier:
   - command: python3 -B -m unittest discover -s tools/agent-bridge/tests -p test*.py
     exit_code: 0
     stdout_excerpt: ''
-    stderr_excerpt: '................................
+    stderr_excerpt: '..................................
 
       ----------------------------------------------------------------------
 
-      Ran 32 tests in 0.141s
+      Ran 34 tests in 0.193s
 
 
       OK'
@@ -97,12 +97,14 @@ verifier:
       dry_run\": true,\n  \"reasons\": [],\n  \"result\": \"pass\",\n  \"tasks\":\
       \ [\n    {\n      \"result\": \"accepted\",\n      \"task_id\": \"M2-T01\"\n\
       \    },\n    {\n      \"result\": \"accepted\",\n      \"task_id\": \"M2-T02\"\
-      \n    },\n    {\n "
+      \n    },\n    {\n      \"result\": \"accepted\",\n      \"task_id\": \"M2-T03\"\
+      \n    },\n    {\n      \"result\": \"accepted\",\n      \"task_id\": \"M2-T04\"\
+      \n    },\n    {\n      \"result\": \"accepted\",\n      \"task_id\": \"M2-T05\"\
+      \n    },\n    {\n      \"result\": \"accepted\",\n      \"task_"
     stderr_excerpt: ''
   environment:
     repo: /Users/yang/Coshare
     branch: main
-    source_mode: git_range
-    base_sha: 626971b
-    head_sha: d788d6d
+    source_mode: worktree_pending_stabilization
+    head_before_evidence: 38b84eb
   conclusion: pass
