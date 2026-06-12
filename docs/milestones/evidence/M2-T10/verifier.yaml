@@ -10,11 +10,11 @@ verifier:
   - command: python3 -B -m unittest discover -s tools/agent-bridge/tests -p test*.py
     exit_code: 0
     stdout_excerpt: ''
-    stderr_excerpt: '..................................
+    stderr_excerpt: '....................................
 
       ----------------------------------------------------------------------
 
-      Ran 34 tests in 0.193s
+      Ran 36 tests in 0.116s
 
 
       OK'
@@ -100,12 +100,14 @@ verifier:
       \n    },\n    {\n      \"result\": \"accepted\",\n      \"task_id\": \"M2-T03\"\
       \n    },\n    {\n      \"result\": \"accepted\",\n      \"task_id\": \"M2-T04\"\
       \n    },\n    {\n      \"result\": \"accepted\",\n      \"task_id\": \"M2-T05\"\
-      \n    },\n    {\n      \"result\": \"accepted\",\n      \"task_"
+      \n    },\n    {\n      \"result\": \"accepted\",\n      \"task_id\": \"M2-T06\"\
+      \n    },\n    {\n      \"result\": \"accepted\",\n      \"task_id\": \"M2-T07\"\
+      \n    },\n    {\n      \"result\": \"accepted\",\n      \"task_id\": \"M2-T08\"\
+      \n    },\n    {\n      \"result\": \"accepted\",\n      \"task"
     stderr_excerpt: ''
   environment:
     repo: /Users/yang/Coshare
     branch: main
-    source_mode: git_range
-    base_sha: 38b84eb
-    head_sha: f6ad93e
+    source_mode: worktree_pending_stabilization
+    head_before_evidence: 7d3b4c0
   conclusion: pass
