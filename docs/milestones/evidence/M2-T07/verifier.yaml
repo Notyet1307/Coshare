@@ -1,0 +1,50 @@
+schema_version: 1
+task_id: M2-T07
+verifier:
+  commands:
+  - command: tools/agent-bridge/agent-bridge prompt-pack --task M2-T07 --role builder
+      --milestone docs/milestones/M2.md --json
+    exit_code: 0
+    stdout_excerpt: "{\n  \"prompt\": \"You are acting as builder for task M2-T07.\\\
+      n\\nRepository: /Users/yang/Coshare\\nMilestone: docs/milestones/M2.md\\nTask:\
+      \ Bridge prompt-pack command\\nMode: direct\\nRisk: medium\\nLifecycle status:\
+      \ ready\\n\\nMilestone docs are the canonical task sourc"
+    stderr_excerpt: ''
+  - command: tools/agent-bridge/agent-bridge prompt-pack --task M2-T07 --role verifier
+      --milestone docs/milestones/M2.md --json
+    exit_code: 0
+    stdout_excerpt: "{\n  \"prompt\": \"You are acting as verifier for task M2-T07.\\\
+      n\\nRepository: /Users/yang/Coshare\\nMilestone: docs/milestones/M2.md\\nTask:\
+      \ Bridge prompt-pack command\\nMode: direct\\nRisk: medium\\nLifecycle status:\
+      \ ready\\n\\nMilestone docs are the canonical task sour"
+    stderr_excerpt: ''
+  - command: tools/agent-bridge/agent-bridge prompt-pack --task M2-T07 --role reviewer
+      --milestone docs/milestones/M2.md --json
+    exit_code: 0
+    stdout_excerpt: "{\n  \"prompt\": \"You are acting as reviewer for task M2-T07.\\\
+      n\\nRepository: /Users/yang/Coshare\\nMilestone: docs/milestones/M2.md\\nTask:\
+      \ Bridge prompt-pack command\\nMode: direct\\nRisk: medium\\nLifecycle status:\
+      \ ready\\n\\nMilestone docs are the canonical task sour"
+    stderr_excerpt: ''
+  - command: tools/agent-bridge/agent-bridge prompt-pack --task M2-T07 --role functional-tester
+      --milestone docs/milestones/M2.md --json
+    exit_code: 0
+    stdout_excerpt: "{\n  \"prompt\": \"You are acting as functional-tester for task\
+      \ M2-T07.\\n\\nRepository: /Users/yang/Coshare\\nMilestone: docs/milestones/M2.md\\\
+      nTask: Bridge prompt-pack command\\nMode: direct\\nRisk: medium\\nLifecycle\
+      \ status: ready\\n\\nMilestone docs are the canonical "
+    stderr_excerpt: ''
+  - command: tools/agent-bridge/agent-bridge prompt-pack --task M2-T07 --role closeout
+      --milestone docs/milestones/M2.md --json
+    exit_code: 0
+    stdout_excerpt: "{\n  \"prompt\": \"You are acting as closeout for task M2-T07.\\\
+      n\\nRepository: /Users/yang/Coshare\\nMilestone: docs/milestones/M2.md\\nTask:\
+      \ Bridge prompt-pack command\\nMode: direct\\nRisk: medium\\nLifecycle status:\
+      \ ready\\n\\nMilestone docs are the canonical task sour"
+    stderr_excerpt: ''
+  environment:
+    repo: /Users/yang/Coshare
+    branch: main
+    source_mode: worktree_pending_stabilization
+    head_before_evidence: f3b42ad
+  conclusion: pass
