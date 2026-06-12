@@ -7,7 +7,11 @@ changed_files:
 - docs/milestones/evidence/M4-T02/path-policy.yaml
 reasons: []
 source:
-  mode: worktree
+  mode: git_range
+  base_sha: d9fd53c5d05bf015742068d0e5e79e07406449e8
+  head_sha: 4868ac9f79bbcb78d97b6e89bb3de72ff14ff6f6
+  base: d9fd53c5d05bf015742068d0e5e79e07406449e8
+  head: 4868ac9f79bbcb78d97b6e89bb3de72ff14ff6f6
   include_paths:
   - docs/agent/issue-sync-rules.md
   - docs/milestones/M4.md
