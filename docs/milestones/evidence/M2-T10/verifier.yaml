@@ -108,6 +108,7 @@ verifier:
   environment:
     repo: /Users/yang/Coshare
     branch: main
-    source_mode: worktree_pending_stabilization
-    head_before_evidence: 7d3b4c0
+    source_mode: git_range
+    base_sha: 7d3b4c0
+    head_sha: afdf05b
   conclusion: pass
