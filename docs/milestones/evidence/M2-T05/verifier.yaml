@@ -1,0 +1,18 @@
+schema_version: 1
+task_id: M2-T05
+verifier:
+  commands:
+  - command: tools/agent-bridge/agent-bridge task-info --task M2-T05 --milestone docs/milestones/M2.md
+      --json
+    exit_code: 0
+    stdout_excerpt: "{\n  \"milestone\": \"docs/milestones/M2.md\",\n  \"reasons\"\
+      : [],\n  \"result\": \"pass\",\n  \"task\": {\n    \"acceptance\": [\n     \
+      \ \"task-info reads a task from an explicit milestone path.\",\n      \"task-info\
+      \ outputs task ID, title, mode, risk, lifecycle status, paths, requir"
+    stderr_excerpt: ''
+  environment:
+    repo: /Users/yang/Coshare
+    branch: main
+    source_mode: worktree_pending_stabilization
+    head_before_evidence: c36d13b
+  conclusion: pass
