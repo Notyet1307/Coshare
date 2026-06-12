@@ -9,4 +9,8 @@ changed_files:
 - tools/agent-bridge/tests/test_agent_bridge.py
 reasons: []
 source:
-  mode: worktree
+  mode: git_range
+  base_sha: 7992240
+  head_sha: ef3555a
+  base: 7992240
+  head: ef3555a
