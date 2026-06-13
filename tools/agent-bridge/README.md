@@ -1,6 +1,6 @@
 # agent-bridge
 
-`agent-bridge` is a local governance CLI for Phase 1, Phase 2, Phase 3, Phase 4, and Phase 5.
+`agent-bridge` is a local governance CLI for Phase 1 through Phase 6.
 
 It does not call Codex, DeepSeek, GitLab, Multica, or any model API.
 
@@ -9,6 +9,8 @@ Phase 3 adds explicit read-only GitHub PR/CI evidence collection.
 Phase 4 adds GitHub Issue execution ticket evidence. GitHub Issues are mirrors only and are not the canonical task source.
 
 Phase 5 adds GitHub delivery linkage and acceptance publication evidence. GitHub comments and labels are publication surfaces only.
+
+Phase 6 adds local external execution evidence for an offline delegation POC. External execution state is evidence only; Bridge gate remains the acceptance authority.
 
 GitHub reads are never the default. Use offline fixture mode for tests.
 
