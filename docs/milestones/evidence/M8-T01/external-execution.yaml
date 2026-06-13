@@ -1,0 +1,19 @@
+# Template only. This is not real evidence.
+# Replace placeholder values only after manually copying normalized state from the real Multica task UI.
+schema_version: 1
+task_id: M8-T01
+backend: multica
+external_id: "<real-multica-task-id>"
+external_url: "<real-multica-task-url>"
+execution_state: assigned
+assigned_agent: "<agent-name>"
+started_at: null
+completed_at: null
+blockers: []
+result_summary: ""
+produced_refs: []
+conclusion: inconclusive
+collection:
+  mode: manual_export
+  network: false
+  source: copied_from_multica_ui
