@@ -12,7 +12,11 @@ changed_files:
 - phase-5-development-plan.md
 reasons: []
 source:
-  mode: worktree
+  mode: git_range
+  base_sha: 61ba83070b21330747c44df20a359fe7aa5f9cdb
+  head_sha: bc794345ced36250f31a461c423fdfc5902f78fc
+  base: 61ba83070b21330747c44df20a359fe7aa5f9cdb
+  head: bc794345ced36250f31a461c423fdfc5902f78fc
   include_paths:
   - phase-5-development-plan.md
   - docs/milestones/M5.md

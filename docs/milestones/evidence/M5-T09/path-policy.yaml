@@ -20,7 +20,11 @@ changed_files:
 - tools/agent-bridge/tests/test_agent_bridge.py
 reasons: []
 source:
-  mode: worktree
+  mode: git_range
+  base_sha: 61ba83070b21330747c44df20a359fe7aa5f9cdb
+  head_sha: bc794345ced36250f31a461c423fdfc5902f78fc
+  base: 61ba83070b21330747c44df20a359fe7aa5f9cdb
+  head: bc794345ced36250f31a461c423fdfc5902f78fc
   include_paths:
   - tools/agent-bridge/tests/**
   - tools/agent-bridge/README.md
