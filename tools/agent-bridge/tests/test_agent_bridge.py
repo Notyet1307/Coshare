@@ -1146,6 +1146,195 @@ class AgentBridgeTests(unittest.TestCase):
         self.assertIn("https://github.com/Notyet1307/Coshare/issues/44", block)
         self.assertIn("Issue conclusion: pass", block)
 
+    def test_delivery_link_from_fixture_writes_evidence_and_passes_gate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old_root = agent_bridge.EVIDENCE_ROOT
+            agent_bridge.EVIDENCE_ROOT = Path(tmp)
+            evidence_dir = Path(tmp) / "FX-T01"
+            evidence_dir.mkdir()
+            write_path_policy(evidence_dir)
+            try:
+                payload = agent_bridge.delivery_link_payload(task(), str(FIXTURES / "delivery" / "pass.json"), True, "FX")
+                gate = agent_bridge.gate_payload(task(required_delivery_evidence=["linkage"]))
+                linkage = yaml.safe_load((evidence_dir / "delivery-linkage.yaml").read_text(encoding="utf-8"))
+            finally:
+                agent_bridge.EVIDENCE_ROOT = old_root
+        self.assertEqual(payload["result"], "pass")
+        self.assertEqual(linkage["linkage_status"], "accepted")
+        self.assertEqual(gate["result"], "accepted")
+
+    def test_delivery_plan_reads_delivery_linkage_evidence(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old_root = agent_bridge.EVIDENCE_ROOT
+            agent_bridge.EVIDENCE_ROOT = Path(tmp)
+            evidence_dir = Path(tmp) / "FX-T01"
+            evidence_dir.mkdir()
+            write_path_policy(evidence_dir)
+            agent_bridge.delivery_link_payload(task(), str(FIXTURES / "delivery" / "pass.json"), True, "FX")
+            try:
+                payload = agent_bridge.delivery_plan_payload([task()], FIXTURES / "valid_milestone.md", "Notyet1307/Coshare")
+            finally:
+                agent_bridge.EVIDENCE_ROOT = old_root
+        item = payload["items"][0]
+        self.assertEqual(item["issue"], "https://github.com/Notyet1307/Coshare/issues/501")
+        self.assertEqual(item["pr"], "https://github.com/Notyet1307/Coshare/pull/5")
+        self.assertEqual(item["pr_head_sha"], "head-sha")
+        self.assertEqual(item["ci_result"], "pass")
+        self.assertEqual(item["review_result"], "pass")
+        self.assertEqual(item["bridge_gate_result"], "accepted")
+        self.assertEqual(item["delivery_status"], "accepted")
+
+    def test_missing_delivery_linkage_is_inconclusive(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old_root = agent_bridge.EVIDENCE_ROOT
+            agent_bridge.EVIDENCE_ROOT = Path(tmp)
+            evidence_dir = Path(tmp) / "FX-T01"
+            evidence_dir.mkdir()
+            write_path_policy(evidence_dir)
+            try:
+                gate = agent_bridge.gate_payload(task(required_delivery_evidence=["linkage"]))
+            finally:
+                agent_bridge.EVIDENCE_ROOT = old_root
+        self.assertEqual(gate["result"], "inconclusive")
+        self.assertIn("missing_delivery_linkage_evidence", {reason["code"] for reason in gate["reasons"]})
+
+    def test_delivery_issue_marker_mismatch_fails_gate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old_root = agent_bridge.EVIDENCE_ROOT
+            agent_bridge.EVIDENCE_ROOT = Path(tmp)
+            evidence_dir = Path(tmp) / "FX-T01"
+            evidence_dir.mkdir()
+            write_path_policy(evidence_dir)
+            agent_bridge.delivery_link_payload(task(), str(FIXTURES / "delivery" / "issue_task_mismatch.json"), True, "FX")
+            try:
+                gate = agent_bridge.gate_payload(task(required_delivery_evidence=["linkage"]))
+            finally:
+                agent_bridge.EVIDENCE_ROOT = old_root
+        self.assertEqual(gate["result"], "failed")
+        self.assertIn("delivery_issue_task_id_mismatch", {reason["code"] for reason in gate["reasons"]})
+
+    def test_delivery_pr_head_mismatch_fails_gate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old_root = agent_bridge.EVIDENCE_ROOT
+            agent_bridge.EVIDENCE_ROOT = Path(tmp)
+            evidence_dir = Path(tmp) / "FX-T01"
+            evidence_dir.mkdir()
+            write_path_policy(evidence_dir)
+            agent_bridge.delivery_link_payload(task(), str(FIXTURES / "delivery" / "pr_head_mismatch.json"), True, "FX")
+            try:
+                gate = agent_bridge.gate_payload(task(required_delivery_evidence=["linkage"]))
+            finally:
+                agent_bridge.EVIDENCE_ROOT = old_root
+        self.assertEqual(gate["result"], "failed")
+        self.assertIn("delivery_pr_ci_head_sha_mismatch", {reason["code"] for reason in gate["reasons"]})
+
+    def test_delivery_ci_failed_fails_gate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old_root = agent_bridge.EVIDENCE_ROOT
+            agent_bridge.EVIDENCE_ROOT = Path(tmp)
+            evidence_dir = Path(tmp) / "FX-T01"
+            evidence_dir.mkdir()
+            write_path_policy(evidence_dir)
+            agent_bridge.delivery_link_payload(task(), str(FIXTURES / "delivery" / "ci_failed.json"), True, "FX")
+            try:
+                gate = agent_bridge.gate_payload(task(required_delivery_evidence=["linkage"]))
+            finally:
+                agent_bridge.EVIDENCE_ROOT = old_root
+        self.assertEqual(gate["result"], "failed")
+        self.assertIn("delivery_ci_failed", {reason["code"] for reason in gate["reasons"]})
+
+    def test_delivery_ci_missing_is_inconclusive(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old_root = agent_bridge.EVIDENCE_ROOT
+            agent_bridge.EVIDENCE_ROOT = Path(tmp)
+            evidence_dir = Path(tmp) / "FX-T01"
+            evidence_dir.mkdir()
+            write_path_policy(evidence_dir)
+            agent_bridge.delivery_link_payload(task(), str(FIXTURES / "delivery" / "ci_missing.json"), True, "FX")
+            try:
+                gate = agent_bridge.gate_payload(task(required_delivery_evidence=["linkage"]))
+            finally:
+                agent_bridge.EVIDENCE_ROOT = old_root
+        self.assertEqual(gate["result"], "inconclusive")
+        self.assertIn("delivery_ci_missing", {reason["code"] for reason in gate["reasons"]})
+
+    def test_delivery_pr_merged_without_gate_is_inconclusive(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old_root = agent_bridge.EVIDENCE_ROOT
+            agent_bridge.EVIDENCE_ROOT = Path(tmp)
+            evidence_dir = Path(tmp) / "FX-T01"
+            evidence_dir.mkdir()
+            write_path_policy(evidence_dir)
+            agent_bridge.delivery_link_payload(task(), str(FIXTURES / "delivery" / "pr_merged_without_gate.json"), True, "FX")
+            try:
+                gate = agent_bridge.gate_payload(task(required_delivery_evidence=["linkage"]))
+            finally:
+                agent_bridge.EVIDENCE_ROOT = old_root
+        self.assertEqual(gate["result"], "inconclusive")
+        self.assertIn("delivery_pr_merged_without_bridge_acceptance", {reason["code"] for reason in gate["reasons"]})
+
+    def test_delivery_issue_closed_without_gate_is_inconclusive(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old_root = agent_bridge.EVIDENCE_ROOT
+            agent_bridge.EVIDENCE_ROOT = Path(tmp)
+            evidence_dir = Path(tmp) / "FX-T01"
+            evidence_dir.mkdir()
+            write_path_policy(evidence_dir)
+            agent_bridge.delivery_link_payload(task(), str(FIXTURES / "delivery" / "issue_closed_without_gate.json"), True, "FX")
+            try:
+                gate = agent_bridge.gate_payload(task(required_delivery_evidence=["linkage"]))
+            finally:
+                agent_bridge.EVIDENCE_ROOT = old_root
+        self.assertEqual(gate["result"], "inconclusive")
+        self.assertIn("delivery_issue_closed_without_bridge_acceptance", {reason["code"] for reason in gate["reasons"]})
+
+    def test_publish_status_dry_run_uses_non_closing_refs(self):
+        payload = agent_bridge.publish_status_payload(task(), "Notyet1307/Coshare", "501", "5", "both", False, False)
+        self.assertEqual(payload["result"], "pass")
+        self.assertIn("Refs #", payload["comment_body"])
+        self.assertNotRegex(payload["comment_body"].lower(), r"\b(closes|fixes|resolves)\b")
+        self.assertFalse(payload["publication"]["remote_write_performed"])
+
+    def test_publish_status_duplicate_comments_is_inconclusive(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old_root = agent_bridge.EVIDENCE_ROOT
+            agent_bridge.EVIDENCE_ROOT = Path(tmp)
+            evidence_dir = Path(tmp) / "FX-T01"
+            evidence_dir.mkdir()
+            write_path_policy(evidence_dir)
+            try:
+                payload = agent_bridge.publish_status_payload(task(), "Notyet1307/Coshare", "501", "5", "both", False, True, str(FIXTURES / "delivery" / "duplicate_comments.json"))
+            finally:
+                agent_bridge.EVIDENCE_ROOT = old_root
+        self.assertEqual(payload["result"], "inconclusive")
+        self.assertIn("duplicate_managed_status_comments", {reason["code"] for reason in payload["reasons"]})
+
+    def test_publish_status_live_write_without_gh_is_inconclusive(self):
+        old_which = agent_bridge.shutil.which
+        agent_bridge.shutil.which = lambda name: None if name == "gh" else old_which(name)
+        try:
+            payload = agent_bridge.publish_status_payload(task(), "Notyet1307/Coshare", "501", "5", "issue", True, False)
+        finally:
+            agent_bridge.shutil.which = old_which
+        self.assertEqual(payload["result"], "inconclusive")
+        self.assertEqual(payload["reasons"][0]["code"], "gh_cli_unavailable")
+
+    def test_closeout_block_includes_delivery_summary(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old_root = agent_bridge.EVIDENCE_ROOT
+            agent_bridge.EVIDENCE_ROOT = Path(tmp)
+            evidence_dir = Path(tmp) / "FX-T01"
+            evidence_dir.mkdir()
+            write_path_policy(evidence_dir)
+            agent_bridge.delivery_link_payload(task(), str(FIXTURES / "delivery" / "pass.json"), True, "FX")
+            try:
+                gate = agent_bridge.gate_payload(task(required_delivery_evidence=["linkage"]))
+                block = agent_bridge.closeout_block(task(required_delivery_evidence=["linkage"]), gate, FIXTURES / "valid_milestone.md")
+            finally:
+                agent_bridge.EVIDENCE_ROOT = old_root
+        self.assertIn("Delivery linkage evidence:", block)
+        self.assertIn("Delivery status: accepted", block)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,12 +1,14 @@
 # agent-bridge
 
-`agent-bridge` is a local governance CLI for Phase 1, Phase 2, Phase 3, and Phase 4.
+`agent-bridge` is a local governance CLI for Phase 1, Phase 2, Phase 3, Phase 4, and Phase 5.
 
 It does not call Codex, DeepSeek, GitLab, Multica, or any model API.
 
 Phase 3 adds explicit read-only GitHub PR/CI evidence collection.
 
 Phase 4 adds GitHub Issue execution ticket evidence. GitHub Issues are mirrors only and are not the canonical task source.
+
+Phase 5 adds GitHub delivery linkage and acceptance publication evidence. GitHub comments and labels are publication surfaces only.
 
 GitHub reads are never the default. Use offline fixture mode for tests.
 
@@ -28,6 +30,11 @@ tools/agent-bridge/agent-bridge issue-plan --milestone docs/milestones/M4.md --r
 tools/agent-bridge/agent-bridge issue-export --task M4-T06 --milestone docs/milestones/M4.md --repo Notyet1307/Coshare --json
 tools/agent-bridge/agent-bridge issue-status --task M4-T11 --milestone docs/milestones/M4.md --from-json tools/agent-bridge/tests/fixtures/issues/pass.json --write-evidence --json
 tools/agent-bridge/agent-bridge issue-comment --task M4-T11 --milestone docs/milestones/M4.md --repo Notyet1307/Coshare --issue <number> --write-evidence --json
+tools/agent-bridge/agent-bridge delivery-plan --milestone docs/milestones/M5.md --repo Notyet1307/Coshare --json
+tools/agent-bridge/agent-bridge delivery-link --task M5-T10 --milestone docs/milestones/M5.md --from-json tools/agent-bridge/tests/fixtures/delivery/pass.json --write-evidence --json
+tools/agent-bridge/agent-bridge delivery-status --task M5-T10 --milestone docs/milestones/M5.md --json
+tools/agent-bridge/agent-bridge publish-status --task M5-T10 --milestone docs/milestones/M5.md --target-surface both --write-evidence --json
+tools/agent-bridge/agent-bridge delivery-closeout --milestone docs/milestones/M5.md --milestone-name M5 --dry-run --json
 tools/agent-bridge/agent-bridge gate --task M3-T09
 tools/agent-bridge/agent-bridge closeout --milestone M3 --milestone-name M3 --dry-run
 tools/agent-bridge/agent-bridge gate --task M1-T08
@@ -50,6 +57,11 @@ These commands support `--json`:
 - `issue-export`
 - `issue-status`
 - `issue-comment`
+- `delivery-plan`
+- `delivery-link`
+- `delivery-status`
+- `publish-status`
+- `delivery-closeout`
 - `gate`
 - `closeout`
 
@@ -59,9 +71,9 @@ Phase 2 keeps `docs/milestones/M1.md` as the default milestone for backward comp
 
 Use `--milestone docs/milestones/M2.md` for Phase 2 tasks.
 
-Task-scoped commands may infer `docs/milestones/M2.md`, `docs/milestones/M3.md`, or `docs/milestones/M4.md` from task IDs such as `M2-T05`, `M3-T09`, or `M4-T11` when `--milestone` is omitted.
+Task-scoped commands may infer `docs/milestones/M2.md`, `docs/milestones/M3.md`, `docs/milestones/M4.md`, or `docs/milestones/M5.md` from task IDs such as `M2-T05`, `M3-T09`, `M4-T11`, or `M5-T10` when `--milestone` is omitted.
 
-Milestone arguments also accept shorthand values such as `M2`, `M3`, and `M4`.
+Milestone arguments also accept shorthand values such as `M2`, `M3`, `M4`, and `M5`.
 
 `evidence-init` creates skeleton evidence only. It does not mark evidence as passing.
 
@@ -153,6 +165,41 @@ If `gh` auth is missing for a live read/write, the command returns `inconclusive
 Tests must use offline fixture mode and must not require live GitHub auth.
 
 Gate consumes issue evidence only when a task contract declares `required_issue_evidence`.
+
+## Phase 5 Notes
+
+Phase 5 keeps milestone docs as the canonical task source.
+
+GitHub Issues, PRs, CI checks, reviews, comments, and labels are evidence or publication surfaces only.
+
+`delivery-plan` reads milestone contracts and existing local evidence to show task -> issue -> PR -> CI/review -> gate -> closeout linkage. It performs no remote writes.
+
+`delivery-link` creates or validates `delivery-linkage.yaml`. It supports offline fixture mode and local evidence mode.
+
+`delivery-status` reports current delivery linkage status from structured evidence.
+
+`publish-status` generates a managed status comment body. It defaults to dry-run. Live writes require explicit `--write` and separate user authorization.
+
+`delivery-closeout` writes closeout with delivery linkage summaries.
+
+Expected Phase 5 evidence files:
+
+- `delivery-linkage.yaml`
+- `acceptance-publication.yaml`
+- `github-status-comment.yaml`
+
+The delivery adapter must not:
+
+- make GitHub Issues canonical
+- update milestone docs from GitHub
+- create PRs
+- push branches
+- merge PRs
+- auto-close issues
+- use closing keywords such as closes, fixes, or resolves
+- print or write tokens
+
+Gate consumes delivery evidence only when a task contract declares `required_delivery_evidence`.
 
 ## Exit Codes
 

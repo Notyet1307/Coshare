@@ -1,0 +1,10 @@
+schema_version: 1
+task_id: M5-T02
+reviewer:
+  reviewer_id: phase5-doc-review
+  conclusion: pass
+  findings: []
+  notes:
+    - Delivery linkage schema and drift rules are documented.
+    - Issue closed, PR merged, and CI passed are not final acceptance.
+  reviewed_at: "2026-06-13T03:21:00Z"

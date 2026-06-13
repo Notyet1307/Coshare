@@ -1,0 +1,11 @@
+{
+  "delivery_linkage": {
+    "repository": "Notyet1307/Coshare",
+    "issue_number": 502,
+    "issue_url": "https://github.com/Notyet1307/Coshare/issues/502",
+    "issue_marker_task_id": "WRONG-TASK",
+    "issue_marker_canonical_owner": "repo-doc",
+    "issue_marker_task_revision": "1",
+    "bridge_gate_result": "accepted"
+  }
+}

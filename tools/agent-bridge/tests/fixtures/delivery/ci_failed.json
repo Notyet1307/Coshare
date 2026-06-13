@@ -1,0 +1,12 @@
+{
+  "delivery_linkage": {
+    "repository": "Notyet1307/Coshare",
+    "issue_marker_task_id": "FX-T01",
+    "issue_marker_canonical_owner": "repo-doc",
+    "issue_marker_task_revision": "1",
+    "pr_head_sha": "head-sha",
+    "ci_head_sha": "head-sha",
+    "ci_result": "fail",
+    "bridge_gate_result": "accepted"
+  }
+}

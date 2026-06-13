@@ -1,0 +1,10 @@
+schema_version: 1
+task_id: M5-T03
+reviewer:
+  reviewer_id: phase5-doc-review
+  conclusion: pass
+  findings: []
+  notes:
+    - Publication and comment boundaries forbid closing keywords and raw logs.
+    - Comments are communication surfaces only.
+  reviewed_at: "2026-06-13T03:21:00Z"

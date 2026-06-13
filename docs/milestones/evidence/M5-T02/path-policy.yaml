@@ -1,0 +1,20 @@
+schema_version: 1
+task_id: M5-T02
+result: pass
+changed_files:
+- docs/agent/github-delivery-linkage.md
+- docs/milestones/M5.md
+- docs/milestones/evidence/M5-T02/gate-report.yaml
+- docs/milestones/evidence/M5-T02/path-policy.yaml
+- docs/milestones/evidence/M5-T02/reviewer.yaml
+reasons: []
+source:
+  mode: git_range
+  base_sha: 61ba83070b21330747c44df20a359fe7aa5f9cdb
+  head_sha: bc794345ced36250f31a461c423fdfc5902f78fc
+  base: 61ba83070b21330747c44df20a359fe7aa5f9cdb
+  head: bc794345ced36250f31a461c423fdfc5902f78fc
+  include_paths:
+  - docs/agent/github-delivery-linkage.md
+  - docs/milestones/M5.md
+  - docs/milestones/evidence/M5-T02/**

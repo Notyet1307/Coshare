@@ -1,0 +1,10 @@
+schema_version: 1
+task_id: M5-T12
+reviewer:
+  reviewer_id: phase5-closeout-review
+  conclusion: pass
+  findings: []
+  notes:
+    - Closeout should state offline/dry-run mode and no token storage.
+    - Final acceptance should not be claimed from stable SHA evidence before commit.
+  reviewed_at: "2026-06-13T03:21:00Z"

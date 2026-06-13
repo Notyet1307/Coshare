@@ -1,0 +1,22 @@
+{
+  "delivery_linkage": {
+    "repository": "Notyet1307/Coshare",
+    "issue_number": 501,
+    "issue_url": "https://github.com/Notyet1307/Coshare/issues/501",
+    "issue_marker_task_id": "FX-T01",
+    "issue_marker_canonical_owner": "repo-doc",
+    "issue_marker_task_revision": "1",
+    "issue_state": "open",
+    "pr_number": 5,
+    "pr_url": "https://github.com/Notyet1307/Coshare/pull/5",
+    "pr_head_sha": "head-sha",
+    "ci_head_sha": "head-sha",
+    "verifier_head_sha": "head-sha",
+    "reviewer_head_sha": "head-sha",
+    "ci_result": "pass",
+    "review_result": "pass",
+    "path_policy_result": "pass",
+    "bridge_gate_result": "accepted",
+    "closeout_ref": "docs/milestones/closeout/FX.md"
+  }
+}
