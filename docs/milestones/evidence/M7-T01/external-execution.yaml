@@ -1,0 +1,17 @@
+schema_version: 1
+task_id: M7-T01
+backend: multica
+external_id: multica-task-manual-001
+external_url: https://multica.example/workspaces/coshare/tasks/multica-task-manual-001
+execution_state: completed
+assigned_agent: multica-fixture-agent
+started_at: "2026-06-13T00:00:00Z"
+completed_at: "2026-06-13T00:10:00Z"
+blockers: []
+result_summary: "Manual-export fixture reports Multica execution completed. This is evidence only and is not acceptance."
+produced_refs: []
+conclusion: pass
+collection:
+  mode: offline_fixture
+  network: false
+  source: fixture_json

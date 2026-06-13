@@ -169,6 +169,66 @@ def write_external_execution(evidence_dir: Path, execution_state: str = "complet
     )
 
 
+def write_multica_execution(evidence_dir: Path, execution_state: str = "completed", conclusion: str = "pass"):
+    (evidence_dir / "external-execution.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": 1,
+                "task_id": "FX-T01",
+                "backend": "multica",
+                "external_id": "multica-task-123",
+                "external_url": "https://multica.example/tasks/123",
+                "execution_state": execution_state,
+                "assigned_agent": "multica-agent",
+                "started_at": "2026-06-13T00:00:00Z",
+                "completed_at": "2026-06-13T00:10:00Z" if execution_state == "completed" else None,
+                "blockers": [],
+                "result_summary": "Manual export from Multica UI.",
+                "produced_refs": [],
+                "conclusion": conclusion,
+                "collection": {
+                    "mode": "manual_export",
+                    "network": False,
+                    "source": "copied_from_multica_ui",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def write_verifier_pass(evidence_dir: Path):
+    (evidence_dir / "verifier.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": 1,
+                "task_id": "FX-T01",
+                "verifier": {
+                    "commands": [{"command": "true", "exit_code": 0}],
+                    "conclusion": "pass",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def write_reviewer_pass(evidence_dir: Path):
+    (evidence_dir / "reviewer.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": 1,
+                "task_id": "FX-T01",
+                "reviewer": {
+                    "findings": [],
+                    "conclusion": "pass",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
 class AgentBridgeTests(unittest.TestCase):
     def setUp(self):
         self.old_changed_paths = agent_bridge.changed_paths
@@ -1400,6 +1460,50 @@ class AgentBridgeTests(unittest.TestCase):
                 agent_bridge.EVIDENCE_ROOT = old_root
         self.assertEqual(payload["result"], "inconclusive")
         self.assertIn("missing_path_policy", {reason["code"] for reason in payload["reasons"]})
+
+    def test_multica_completed_without_bridge_evidence_is_inconclusive(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old_root = agent_bridge.EVIDENCE_ROOT
+            agent_bridge.EVIDENCE_ROOT = Path(tmp)
+            evidence_dir = Path(tmp) / "FX-T01"
+            evidence_dir.mkdir()
+            write_multica_execution(evidence_dir, execution_state="completed", conclusion="pass")
+            try:
+                payload = agent_bridge.gate_payload(task(required_external_execution_evidence=["execution"]))
+            finally:
+                agent_bridge.EVIDENCE_ROOT = old_root
+        self.assertEqual(payload["checks"]["external_execution_evidence"], "pass")
+        self.assertEqual(payload["result"], "inconclusive")
+        self.assertIn("missing_path_policy", {reason["code"] for reason in payload["reasons"]})
+
+    def test_multica_completed_is_accepted_only_with_normal_bridge_evidence(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old_root = agent_bridge.EVIDENCE_ROOT
+            agent_bridge.EVIDENCE_ROOT = Path(tmp)
+            evidence_dir = Path(tmp) / "FX-T01"
+            evidence_dir.mkdir()
+            write_path_policy(evidence_dir)
+            write_verifier_pass(evidence_dir)
+            write_reviewer_pass(evidence_dir)
+            write_multica_execution(evidence_dir, execution_state="completed", conclusion="pass")
+            try:
+                payload = agent_bridge.gate_payload(
+                    task(
+                        required_evidence={
+                            "verifier": "required",
+                            "reviewer": "required",
+                            "functional_test": "not_applicable",
+                        },
+                        required_external_execution_evidence=["execution"],
+                    )
+                )
+            finally:
+                agent_bridge.EVIDENCE_ROOT = old_root
+        self.assertEqual(payload["checks"]["external_execution_evidence"], "pass")
+        self.assertEqual(payload["checks"]["path_policy"], "pass")
+        self.assertEqual(payload["checks"]["verifier"], "pass")
+        self.assertEqual(payload["checks"]["reviewer"], "pass")
+        self.assertEqual(payload["result"], "accepted")
 
 
 if __name__ == "__main__":

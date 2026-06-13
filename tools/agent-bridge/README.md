@@ -1,6 +1,6 @@
 # agent-bridge
 
-`agent-bridge` is a local governance CLI for Phase 1 through Phase 6.
+`agent-bridge` is a local governance CLI for Phase 1 through Phase 7.
 
 It does not call Codex, DeepSeek, GitLab, Multica, or any model API.
 
@@ -11,6 +11,8 @@ Phase 4 adds GitHub Issue execution ticket evidence. GitHub Issues are mirrors o
 Phase 5 adds GitHub delivery linkage and acceptance publication evidence. GitHub comments and labels are publication surfaces only.
 
 Phase 6 adds local external execution evidence for an offline delegation POC. External execution state is evidence only; Bridge gate remains the acceptance authority.
+
+Phase 7 adds a constrained Multica manual-export evidence POC. Bridge still consumes local evidence only and does not call Multica APIs.
 
 GitHub reads are never the default. Use offline fixture mode for tests.
 
@@ -232,6 +234,16 @@ The Phase 6 external execution evidence support must not:
 - merge PRs
 - perform live GitHub writes
 - print or write tokens
+
+## Phase 7 Notes
+
+Phase 7 uses Multica manual-export or offline fixture evidence only.
+
+Expected Phase 7 evidence file:
+
+- `external-execution.yaml` with `backend: multica` and `collection.network: false`
+
+The Phase 7 POC must not call Multica APIs, create or update Multica tasks, read live Multica state inside Bridge gate, write Multica comments, store Multica tokens, or treat Multica completed as accepted.
 
 ## Exit Codes
 
