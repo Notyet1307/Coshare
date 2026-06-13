@@ -75,6 +75,9 @@ DELIVERY_EVIDENCE_FILES = {
     "publication": "acceptance-publication.yaml",
     "status_comment": "github-status-comment.yaml",
 }
+EXTERNAL_EXECUTION_EVIDENCE_FILES = {
+    "execution": "external-execution.yaml",
+}
 TOKEN_KEY_RE = re.compile(r"(token|authorization|cookie|password|secret)", re.IGNORECASE)
 TOKEN_VALUE_RE = re.compile(r"(gh[pousr]_[A-Za-z0-9_]+|github_pat_[A-Za-z0-9_]+|Bearer\s+[A-Za-z0-9._-]+)")
 PROMPT_ROLES = {
@@ -1294,6 +1297,65 @@ def check_delivery_evidence(task: dict[str, Any]) -> tuple[str, list[dict[str, A
     return result, reasons
 
 
+def required_external_execution_evidence(task: dict[str, Any]) -> list[str]:
+    value = task.get("required_external_execution_evidence")
+    if isinstance(value, list):
+        return [str(item) for item in value]
+    external = task.get("external_execution_evidence")
+    if isinstance(external, dict) and isinstance(external.get("required"), list):
+        return [str(item) for item in external["required"]]
+    return []
+
+
+def check_external_execution_evidence(task: dict[str, Any]) -> tuple[str, list[dict[str, Any]]]:
+    required = required_external_execution_evidence(task)
+    if not required:
+        return "pass", []
+    result = "pass"
+    reasons: list[dict[str, Any]] = []
+    for item in required:
+        filename = EXTERNAL_EXECUTION_EVIDENCE_FILES.get(item)
+        if not filename:
+            result = GATE_INCONCLUSIVE
+            reasons.append({"code": "unknown_required_external_execution_evidence", "message": f"Unknown external execution evidence requirement: {item}"})
+            continue
+        data, error = read_evidence(task["task_id"], filename)
+        if error:
+            result = GATE_INCONCLUSIVE
+            reasons.append({"code": "missing_external_execution_evidence", "message": f"{filename} is required.", "path": rel(evidence_dir(task["task_id"]) / filename)})
+            continue
+        state = str(data.get("execution_state") or "").lower()
+        conclusion = str(data.get("conclusion") or "").lower()
+        blockers = data.get("blockers", [])
+        if not data.get("backend") or not data.get("external_id") or not state:
+            result = GATE_INCONCLUSIVE
+            reasons.append({"code": "invalid_external_execution_evidence", "message": "External execution evidence requires backend, external_id, and execution_state."})
+            continue
+        if conclusion in {"fail", "failed"} or state in {"failed", "failure", "error"}:
+            result = GATE_FAILED
+            reasons.append({"code": "external_execution_failed", "message": "External execution evidence reports failure."})
+            continue
+        if state in {"blocked", "blocking"}:
+            if result != GATE_FAILED:
+                result = GATE_INCONCLUSIVE
+            reasons.append({"code": "external_execution_blocked", "message": "External execution is blocked."})
+            continue
+        if isinstance(blockers, list) and any(isinstance(blocker, dict) and str(blocker.get("status", "open")).lower() not in {"resolved", "closed"} for blocker in blockers):
+            if result != GATE_FAILED:
+                result = GATE_INCONCLUSIVE
+            reasons.append({"code": "external_execution_has_open_blockers", "message": "External execution evidence has open blockers."})
+            continue
+        if state != "completed":
+            if result != GATE_FAILED:
+                result = GATE_INCONCLUSIVE
+            reasons.append({"code": "external_execution_not_completed", "message": "External execution is not completed."})
+        elif conclusion not in {"pass", "completed", "success"}:
+            if result != GATE_FAILED:
+                result = GATE_INCONCLUSIVE
+            reasons.append({"code": "external_execution_inconclusive", "message": "External execution conclusion is not pass."})
+    return result, reasons
+
+
 def run_gh_json(args: list[str]) -> tuple[dict[str, Any] | list[Any] | None, dict[str, Any] | None]:
     if not shutil.which("gh"):
         return None, {"code": "gh_cli_unavailable", "message": "gh CLI is not available."}
@@ -1658,6 +1720,7 @@ def gate_payload(task: dict[str, Any]) -> dict[str, Any]:
         "github_evidence": check_github_evidence(task),
         "issue_evidence": check_issue_evidence(task),
         "delivery_evidence": check_delivery_evidence(task),
+        "external_execution_evidence": check_external_execution_evidence(task),
     }
     reasons: list[dict[str, Any]] = []
     result = GATE_ACCEPTED
@@ -2179,6 +2242,21 @@ def summarize_delivery_evidence(task_id: str) -> list[str]:
     return lines
 
 
+def summarize_external_execution_evidence(task_id: str) -> list[str]:
+    lines: list[str] = []
+    execution, _ = read_evidence(task_id, "external-execution.yaml")
+    if execution:
+        lines.append(f"- Backend: {execution.get('backend', 'unknown')}")
+        lines.append(f"- External ID: {execution.get('external_id', 'unknown')}")
+        if execution.get("external_url"):
+            lines.append(f"- External URL: {execution.get('external_url')}")
+        lines.append(f"- Execution state: {execution.get('execution_state', 'unknown')}")
+        if execution.get("assigned_agent"):
+            lines.append(f"- Assigned agent: {execution.get('assigned_agent')}")
+        lines.append(f"- External conclusion: {execution.get('conclusion', 'unknown')}")
+    return lines
+
+
 def closeout_block(task: dict[str, Any], gate: dict[str, Any], milestone: Path = DEFAULT_MILESTONE) -> str:
     task_id = task["task_id"]
     status = gate["result"]
@@ -2190,6 +2268,7 @@ def closeout_block(task: dict[str, Any], gate: dict[str, Any], milestone: Path =
     github_summary = "\n".join(summarize_github_evidence(task_id)) or "- none"
     issue_summary = "\n".join(summarize_issue_evidence(task_id)) or "- none"
     delivery_summary = "\n".join(summarize_delivery_evidence(task_id)) or "- none"
+    external_execution_summary = "\n".join(summarize_external_execution_evidence(task_id)) or "- none"
     branch = current_branch() or "unknown"
     source_lines = "- none"
     path_policy, _ = read_evidence(task_id, "path-policy.yaml")
@@ -2251,6 +2330,10 @@ GitHub Issue evidence:
 Delivery linkage evidence:
 
 {delivery_summary}
+
+External execution evidence:
+
+{external_execution_summary}
 
 Known risks:
 

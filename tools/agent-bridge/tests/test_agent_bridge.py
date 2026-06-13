@@ -146,6 +146,29 @@ def write_github_issue(evidence_dir: Path, conclusion: str = "pass", task_revisi
     )
 
 
+def write_external_execution(evidence_dir: Path, execution_state: str = "completed", conclusion: str = "pass"):
+    (evidence_dir / "external-execution.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": 1,
+                "task_id": "FX-T01",
+                "backend": "multica-like-offline-fixture",
+                "external_id": "multica-fixture-123",
+                "external_url": None,
+                "execution_state": execution_state,
+                "assigned_agent": "fixture-agent",
+                "started_at": "2026-06-13T00:00:00Z",
+                "completed_at": "2026-06-13T00:10:00Z" if execution_state == "completed" else None,
+                "blockers": [],
+                "result_summary": "Fixture execution state.",
+                "produced_refs": [],
+                "conclusion": conclusion,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
 class AgentBridgeTests(unittest.TestCase):
     def setUp(self):
         self.old_changed_paths = agent_bridge.changed_paths
@@ -1334,6 +1357,49 @@ class AgentBridgeTests(unittest.TestCase):
                 agent_bridge.EVIDENCE_ROOT = old_root
         self.assertIn("Delivery linkage evidence:", block)
         self.assertIn("Delivery status: accepted", block)
+
+    def test_missing_external_execution_evidence_is_inconclusive_when_required(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old_root = agent_bridge.EVIDENCE_ROOT
+            agent_bridge.EVIDENCE_ROOT = Path(tmp)
+            evidence_dir = Path(tmp) / "FX-T01"
+            evidence_dir.mkdir()
+            write_path_policy(evidence_dir)
+            try:
+                payload = agent_bridge.gate_payload(task(required_external_execution_evidence=["execution"]))
+            finally:
+                agent_bridge.EVIDENCE_ROOT = old_root
+        self.assertEqual(payload["result"], "inconclusive")
+        self.assertIn("missing_external_execution_evidence", {reason["code"] for reason in payload["reasons"]})
+
+    def test_external_execution_failure_fails_gate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old_root = agent_bridge.EVIDENCE_ROOT
+            agent_bridge.EVIDENCE_ROOT = Path(tmp)
+            evidence_dir = Path(tmp) / "FX-T01"
+            evidence_dir.mkdir()
+            write_path_policy(evidence_dir)
+            write_external_execution(evidence_dir, execution_state="failed", conclusion="fail")
+            try:
+                payload = agent_bridge.gate_payload(task(required_external_execution_evidence=["execution"]))
+            finally:
+                agent_bridge.EVIDENCE_ROOT = old_root
+        self.assertEqual(payload["result"], "failed")
+        self.assertIn("external_execution_failed", {reason["code"] for reason in payload["reasons"]})
+
+    def test_external_completed_without_bridge_evidence_is_inconclusive(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old_root = agent_bridge.EVIDENCE_ROOT
+            agent_bridge.EVIDENCE_ROOT = Path(tmp)
+            evidence_dir = Path(tmp) / "FX-T01"
+            evidence_dir.mkdir()
+            write_external_execution(evidence_dir, execution_state="completed", conclusion="pass")
+            try:
+                payload = agent_bridge.gate_payload(task(required_external_execution_evidence=["execution"]))
+            finally:
+                agent_bridge.EVIDENCE_ROOT = old_root
+        self.assertEqual(payload["result"], "inconclusive")
+        self.assertIn("missing_path_policy", {reason["code"] for reason in payload["reasons"]})
 
 
 if __name__ == "__main__":

@@ -201,6 +201,36 @@ The delivery adapter must not:
 
 Gate consumes delivery evidence only when a task contract declares `required_delivery_evidence`.
 
+## Phase 6 Notes
+
+Phase 6 keeps Coshare as the governance and acceptance layer while treating external execution platforms as evidence sources only.
+
+Bridge reads local `external-execution.yaml` when a task contract declares:
+
+```yaml
+required_external_execution_evidence:
+  - execution
+```
+
+Expected Phase 6 evidence file:
+
+- `external-execution.yaml`
+
+External execution state is not final acceptance.
+
+The Phase 6 external execution evidence support must not:
+
+- call Multica APIs
+- call model APIs
+- create external execution items
+- schedule workers
+- run autonomous loops
+- create PRs
+- push branches
+- merge PRs
+- perform live GitHub writes
+- print or write tokens
+
 ## Exit Codes
 
 | Result | Exit code |

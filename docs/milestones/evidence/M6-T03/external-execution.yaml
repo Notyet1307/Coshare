@@ -1,0 +1,16 @@
+schema_version: 1
+task_id: M6-T03
+backend: multica-like-offline-fixture
+external_id: multica-fixture-M6-T03
+external_url: null
+execution_state: blocked
+assigned_agent: fixture-agent
+started_at: "2026-06-13T00:00:00Z"
+completed_at: null
+blockers:
+  - id: B1
+    status: open
+    description: "Offline fixture demonstrates external blocked state without contacting a platform."
+result_summary: "Fixture-only external execution record for Phase 6 schema validation."
+produced_refs: []
+conclusion: inconclusive

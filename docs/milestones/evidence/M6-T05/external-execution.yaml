@@ -1,0 +1,15 @@
+schema_version: 1
+task_id: M6-T05
+backend: multica-like-offline-fixture
+external_id: multica-fixture-M6-T05
+external_url: null
+execution_state: completed
+assigned_agent: fixture-agent
+started_at: "2026-06-13T00:00:00Z"
+completed_at: "2026-06-13T00:10:00Z"
+blockers: []
+result_summary: "Offline fixture reports execution completed, but Bridge evidence is intentionally incomplete."
+produced_refs:
+  - type: local_fixture
+    ref: docs/milestones/evidence/M6-T05/external-execution.yaml
+conclusion: pass
