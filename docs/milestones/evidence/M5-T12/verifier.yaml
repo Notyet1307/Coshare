@@ -1,0 +1,13 @@
+schema_version: 1
+task_id: M5-T12
+verifier:
+  conclusion: pass
+  commands:
+    - command: tools/agent-bridge/agent-bridge delivery-closeout --help
+      exit_code: 0
+      stdout_excerpt: "usage: agent-bridge delivery-closeout"
+      stderr_excerpt: ""
+  environment:
+    network_required: false
+    live_github_write: false
+  verified_at: "2026-06-13T03:21:00Z"

@@ -1,0 +1,25 @@
+schema_version: 1
+task_id: M5-T10
+repository: Notyet1307/Coshare
+issue_number: 510
+issue_url: https://github.com/Notyet1307/Coshare/issues/510
+pr_number: 5
+pr_url: https://github.com/Notyet1307/Coshare/pull/5
+pr_head_sha: m5-head-sha
+verifier_head_sha: m5-head-sha
+reviewer_head_sha: m5-head-sha
+ci_head_sha: m5-head-sha
+path_policy_result: pass
+ci_result: pass
+review_result: pass
+bridge_gate_result: accepted
+closeout_ref: docs/milestones/closeout/M5.md
+drift_detected: false
+drift_reasons: []
+linkage_status: accepted
+generated_at: '2026-06-13T03:20:11Z'
+conclusion: pass
+collection:
+  mode: offline_fixture
+  network: false
+  source: from-json

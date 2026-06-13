@@ -1,0 +1,17 @@
+schema_version: 1
+task_id: M5-T10
+verifier:
+  conclusion: pass
+  commands:
+    - command: tools/agent-bridge/agent-bridge delivery-link --task M5-T10 --milestone docs/milestones/M5.md --from-json tools/agent-bridge/tests/fixtures/delivery/m5_t10_pass.json --write-evidence --json
+      exit_code: 0
+      stdout_excerpt: '"path": "docs/milestones/evidence/M5-T10/delivery-linkage.yaml"'
+      stderr_excerpt: ""
+    - command: tools/agent-bridge/agent-bridge publish-status --task M5-T10 --milestone docs/milestones/M5.md --repo Notyet1307/Coshare --issue 510 --pr 5 --target-surface both --write-evidence --json
+      exit_code: 0
+      stdout_excerpt: '"remote_write_performed": false'
+      stderr_excerpt: ""
+  environment:
+    network_required: false
+    live_github_write: false
+  verified_at: "2026-06-13T03:21:00Z"

@@ -1,0 +1,13 @@
+schema_version: 1
+result: accepted
+task_id: M5-T02
+checks:
+  path_policy: pass
+  verifier: pass
+  reviewer: pass
+  functional_test: pass
+  blockers: pass
+  github_evidence: pass
+  issue_evidence: pass
+  delivery_evidence: pass
+reasons: []

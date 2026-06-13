@@ -1,0 +1,15 @@
+schema_version: 1
+task_id: M5-T11
+result: pass
+changed_files:
+- docs/milestones/M5.md
+- docs/milestones/evidence/M5-T11/gate-report.yaml
+- docs/milestones/evidence/M5-T11/path-policy.yaml
+- docs/milestones/evidence/M5-T11/reviewer.yaml
+- docs/milestones/evidence/M5-T11/verifier.yaml
+reasons: []
+source:
+  mode: worktree
+  include_paths:
+  - docs/milestones/evidence/M5-T11/**
+  - docs/milestones/M5.md

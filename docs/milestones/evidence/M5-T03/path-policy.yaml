@@ -1,0 +1,18 @@
+schema_version: 1
+task_id: M5-T03
+result: pass
+changed_files:
+- docs/agent/acceptance-publication.md
+- docs/agent/github-comment-boundaries.md
+- docs/milestones/M5.md
+- docs/milestones/evidence/M5-T03/gate-report.yaml
+- docs/milestones/evidence/M5-T03/path-policy.yaml
+- docs/milestones/evidence/M5-T03/reviewer.yaml
+reasons: []
+source:
+  mode: worktree
+  include_paths:
+  - docs/agent/acceptance-publication.md
+  - docs/agent/github-comment-boundaries.md
+  - docs/milestones/M5.md
+  - docs/milestones/evidence/M5-T03/**

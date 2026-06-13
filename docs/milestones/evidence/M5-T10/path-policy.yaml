@@ -1,0 +1,28 @@
+schema_version: 1
+task_id: M5-T10
+result: pass
+changed_files:
+- docs/milestones/M5.md
+- docs/milestones/evidence/M5-T10/acceptance-publication.yaml
+- docs/milestones/evidence/M5-T10/delivery-linkage.yaml
+- docs/milestones/evidence/M5-T10/gate-report.yaml
+- docs/milestones/evidence/M5-T10/github-status-comment.yaml
+- docs/milestones/evidence/M5-T10/path-policy.yaml
+- docs/milestones/evidence/M5-T10/reviewer.yaml
+- docs/milestones/evidence/M5-T10/verifier.yaml
+- tools/agent-bridge/tests/fixtures/delivery/ci_failed.json
+- tools/agent-bridge/tests/fixtures/delivery/ci_missing.json
+- tools/agent-bridge/tests/fixtures/delivery/duplicate_comments.json
+- tools/agent-bridge/tests/fixtures/delivery/issue_closed_without_gate.json
+- tools/agent-bridge/tests/fixtures/delivery/issue_task_mismatch.json
+- tools/agent-bridge/tests/fixtures/delivery/m5_t10_pass.json
+- tools/agent-bridge/tests/fixtures/delivery/pass.json
+- tools/agent-bridge/tests/fixtures/delivery/pr_head_mismatch.json
+- tools/agent-bridge/tests/fixtures/delivery/pr_merged_without_gate.json
+reasons: []
+source:
+  mode: worktree
+  include_paths:
+  - docs/milestones/evidence/M5-T10/**
+  - docs/milestones/M5.md
+  - tools/agent-bridge/tests/fixtures/delivery/**

@@ -1,0 +1,17 @@
+schema_version: 1
+task_id: M5-T07
+verifier:
+  conclusion: pass
+  commands:
+    - command: tools/agent-bridge/agent-bridge publish-status --task M5-T10 --milestone docs/milestones/M5.md --repo Notyet1307/Coshare --issue 510 --pr 5 --target-surface both --json
+      exit_code: 0
+      stdout_excerpt: '"dry_run": true'
+      stderr_excerpt: ""
+    - command: python3 -m unittest discover tools/agent-bridge/tests
+      exit_code: 0
+      stdout_excerpt: "Ran 72 tests in 0.327s\n\nOK"
+      stderr_excerpt: ""
+  environment:
+    network_required: false
+    live_github_write: false
+  verified_at: "2026-06-13T03:21:00Z"

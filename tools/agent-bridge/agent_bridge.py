@@ -70,6 +70,11 @@ ISSUE_EVIDENCE_FILES = {
     "issue_comment": "github-issue-comment.yaml",
     "sync_report": "issue-sync-report.yaml",
 }
+DELIVERY_EVIDENCE_FILES = {
+    "linkage": "delivery-linkage.yaml",
+    "publication": "acceptance-publication.yaml",
+    "status_comment": "github-status-comment.yaml",
+}
 TOKEN_KEY_RE = re.compile(r"(token|authorization|cookie|password|secret)", re.IGNORECASE)
 TOKEN_VALUE_RE = re.compile(r"(gh[pousr]_[A-Za-z0-9_]+|github_pat_[A-Za-z0-9_]+|Bearer\s+[A-Za-z0-9._-]+)")
 PROMPT_ROLES = {
@@ -941,6 +946,354 @@ def issue_comment_payload(task: dict[str, Any], repo: str | None, issue_number: 
     return payload
 
 
+def load_json_fixture(path: Path, missing_code: str) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
+    if not path.exists():
+        return None, [{"code": missing_code, "path": str(path), "message": "Fixture JSON does not exist."}]
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        return None, [{"code": "invalid_fixture_json", "path": str(path), "message": str(exc)}]
+    if not isinstance(raw, dict):
+        return None, [{"code": "invalid_fixture", "path": str(path), "message": "Fixture must be a JSON object."}]
+    return scrub_secret_values(raw), []
+
+
+def evidence_mapping(task_id: str, filename: str, key: str | None = None) -> dict[str, Any]:
+    data, _ = read_evidence(task_id, filename)
+    if not data:
+        return {}
+    if key and isinstance(data.get(key), dict):
+        return data[key]
+    return data
+
+
+def closeout_has_task(task_id: str, milestone_name: str | None = None) -> bool:
+    names = [milestone_name] if milestone_name else []
+    if not names and (match := re.match(r"(M\d+)-", task_id)):
+        names.append(match.group(1))
+    names.append("M1")
+    for name in dict.fromkeys(item for item in names if item):
+        path = CLOSEOUT_ROOT / f"{name}.md"
+        if path.exists() and f"agent-bridge:closeout:start {task_id}" in path.read_text(encoding="utf-8"):
+            return True
+    return False
+
+
+def delivery_collection(mode: str, network: bool, source: str) -> dict[str, Any]:
+    return {"mode": mode, "network": network, "source": source}
+
+
+def delivery_linkage_from_sources(task: dict[str, Any], fixture: dict[str, Any] | None = None, milestone_name: str | None = None) -> dict[str, Any]:
+    task_id = task["task_id"]
+    fixture = fixture or {}
+    issue = evidence_mapping(task_id, "github-issue.yaml")
+    pr = evidence_mapping(task_id, "github-pr.yaml", "github_pr")
+    ci = evidence_mapping(task_id, "github-ci.yaml", "github_ci")
+    reviews = evidence_mapping(task_id, "github-reviews.yaml", "github_reviews")
+    path_policy = evidence_mapping(task_id, "path-policy.yaml")
+    verifier = evidence_mapping(task_id, "verifier.yaml", "verifier")
+    reviewer = evidence_mapping(task_id, "reviewer.yaml", "reviewer")
+    gate_report = evidence_mapping(task_id, "gate-report.yaml")
+    raw_linkage = fixture.get("delivery_linkage", {}) if isinstance(fixture.get("delivery_linkage"), dict) else {}
+    raw_issue = fixture.get("github_issue", {}) if isinstance(fixture.get("github_issue"), dict) else {}
+    raw_pr = fixture.get("github_pr", {}) if isinstance(fixture.get("github_pr"), dict) else {}
+    raw_ci = fixture.get("github_ci", {}) if isinstance(fixture.get("github_ci"), dict) else {}
+    raw_reviews = fixture.get("github_reviews", {}) if isinstance(fixture.get("github_reviews"), dict) else {}
+    raw_gate = fixture.get("gate_report", {}) if isinstance(fixture.get("gate_report"), dict) else {}
+
+    issue_number = raw_linkage.get("issue_number") or issue.get("issue_number") or raw_issue.get("number") or raw_issue.get("issue_number")
+    issue_url = raw_linkage.get("issue_url") or issue.get("issue_url") or raw_issue.get("url") or raw_issue.get("issue_url")
+    issue_state = str(raw_linkage.get("issue_state") or issue.get("issue_state") or raw_issue.get("state") or "").lower()
+    issue_marker_task_id = raw_linkage.get("issue_marker_task_id") or issue.get("body_marker_task_id")
+    issue_marker_owner = raw_linkage.get("issue_marker_canonical_owner") or issue.get("body_marker_canonical_owner")
+    issue_revision = raw_linkage.get("issue_marker_task_revision") or issue.get("body_marker_task_revision")
+
+    pr_number = raw_linkage.get("pr_number") or pr.get("pr_number") or raw_pr.get("pr_number") or raw_pr.get("number")
+    pr_url = raw_linkage.get("pr_url") or pr.get("pr_url") or raw_pr.get("pr_url") or raw_pr.get("url")
+    pr_head_sha = raw_linkage.get("pr_head_sha") or pr.get("head_sha") or raw_pr.get("head_sha") or raw_pr.get("headRefOid")
+    pr_state = str(raw_linkage.get("pr_state") or pr.get("state") or raw_pr.get("state") or "").lower()
+    pr_merged = bool(raw_linkage.get("pr_merged", pr.get("merged", raw_pr.get("merged", False))))
+
+    ci_head_sha = raw_linkage.get("ci_head_sha") or ci.get("head_sha") or raw_ci.get("head_sha")
+    verifier_head_sha = raw_linkage.get("verifier_head_sha") or verifier.get("head_sha")
+    reviewer_head_sha = raw_linkage.get("reviewer_head_sha") or reviewer.get("head_sha")
+    ci_result = raw_linkage.get("ci_result") or ci.get("conclusion") or infer_ci_conclusion(ci) if ci else raw_linkage.get("ci_result")
+    review_result = raw_linkage.get("review_result") or reviews.get("conclusion") or reviewer.get("conclusion")
+    bridge_gate_result = raw_linkage.get("bridge_gate_result") or gate_report.get("result") or raw_gate.get("result")
+    path_policy_result = raw_linkage.get("path_policy_result") or path_policy.get("result")
+    closeout_ref = raw_linkage.get("closeout_ref") or (f"docs/milestones/closeout/{milestone_name}.md" if closeout_has_task(task_id, milestone_name) else None)
+
+    reasons: list[dict[str, Any]] = []
+    result = "pass"
+    status = "linked"
+
+    if issue_marker_task_id and issue_marker_task_id != task_id:
+        reasons.append({"code": "delivery_issue_task_id_mismatch", "message": "Issue marker task_id does not match milestone task_id."})
+        result = "fail"
+        status = "conflict"
+    if issue_marker_owner and issue_marker_owner != task.get("canonical_owner"):
+        reasons.append({"code": "delivery_issue_owner_mismatch", "message": "Issue canonical owner marker does not match task."})
+        result = "fail"
+        status = "conflict"
+    if issue_revision and str(issue_revision) != str(task.get("revision")):
+        reasons.append({"code": "delivery_issue_revision_stale", "message": "Issue revision marker is stale."})
+        if result != "fail":
+            result = GATE_INCONCLUSIVE
+            status = "stale"
+    for label, value in [("ci", ci_head_sha), ("verifier", verifier_head_sha), ("reviewer", reviewer_head_sha)]:
+        if pr_head_sha and value and str(pr_head_sha) != str(value):
+            reasons.append({"code": f"delivery_pr_{label}_head_sha_mismatch", "message": f"PR head_sha does not match {label} head_sha."})
+            result = "fail"
+            status = "conflict"
+    if ci_result in {"fail", "failed", "failure"}:
+        reasons.append({"code": "delivery_ci_failed", "message": "CI/check evidence failed."})
+        result = "fail"
+        status = "failed"
+    if raw_linkage.get("ci_required") and not ci_result:
+        reasons.append({"code": "delivery_ci_missing", "message": "CI/check evidence is required but missing."})
+        if result != "fail":
+            result = GATE_INCONCLUSIVE
+            status = "inconclusive"
+    if review_result in {"fail", "failed"}:
+        reasons.append({"code": "delivery_review_failed", "message": "Review evidence failed."})
+        result = "fail"
+        status = "failed"
+    if pr_merged and bridge_gate_result != GATE_ACCEPTED:
+        reasons.append({"code": "delivery_pr_merged_without_bridge_acceptance", "message": "PR is merged but Bridge gate is not accepted."})
+        if result != "fail":
+            result = GATE_INCONCLUSIVE
+            status = "conflict"
+    if issue_state == "closed" and bridge_gate_result != GATE_ACCEPTED:
+        reasons.append({"code": "delivery_issue_closed_without_bridge_acceptance", "message": "Issue is closed but Bridge gate is not accepted."})
+        if result != "fail":
+            result = GATE_INCONCLUSIVE
+            status = "conflict"
+    if bridge_gate_result == GATE_FAILED:
+        status = "failed"
+        result = "fail"
+    elif bridge_gate_result == GATE_ACCEPTED and result == "pass":
+        status = "accepted"
+    elif result == "pass" and not any([issue_number, pr_number, bridge_gate_result, closeout_ref]):
+        status = "unlinked"
+        result = GATE_INCONCLUSIVE
+        reasons.append({"code": "delivery_unlinked", "message": "No delivery linkage surfaces were found."})
+
+    return {
+        "schema_version": 1,
+        "task_id": task_id,
+        "repository": raw_linkage.get("repository") or issue.get("repository") or pr.get("repo") or raw_issue.get("repository") or raw_pr.get("repo"),
+        "issue_number": issue_number,
+        "issue_url": issue_url,
+        "pr_number": pr_number,
+        "pr_url": pr_url,
+        "pr_head_sha": pr_head_sha,
+        "verifier_head_sha": verifier_head_sha,
+        "reviewer_head_sha": reviewer_head_sha,
+        "ci_head_sha": ci_head_sha,
+        "path_policy_result": path_policy_result,
+        "ci_result": ci_result,
+        "review_result": review_result,
+        "bridge_gate_result": bridge_gate_result,
+        "closeout_ref": closeout_ref,
+        "drift_detected": bool(reasons),
+        "drift_reasons": reasons,
+        "linkage_status": status,
+        "generated_at": utc_now(),
+        "conclusion": result,
+        "collection": delivery_collection("offline_fixture" if fixture else "local", False, "from-json" if fixture else "local-evidence"),
+    }
+
+
+def delivery_plan_payload(tasks: list[dict[str, Any]], milestone: Path, repo: str | None) -> dict[str, Any]:
+    items = []
+    for task in tasks:
+        task_id = task["task_id"]
+        linkage = evidence_mapping(task_id, "delivery-linkage.yaml")
+        issue = evidence_mapping(task_id, "github-issue.yaml")
+        pr = evidence_mapping(task_id, "github-pr.yaml", "github_pr")
+        ci = evidence_mapping(task_id, "github-ci.yaml", "github_ci")
+        reviews = evidence_mapping(task_id, "github-reviews.yaml", "github_reviews")
+        gate = evidence_mapping(task_id, "gate-report.yaml")
+        items.append({
+            "task_id": task_id,
+            "issue": linkage.get("issue_url") or issue.get("issue_url") or task.get("backend_refs", {}).get("github_issue"),
+            "issue_number": linkage.get("issue_number") or issue.get("issue_number"),
+            "pr": linkage.get("pr_url") or pr.get("pr_url") or task.get("backend_refs", {}).get("pr"),
+            "pr_number": linkage.get("pr_number") or pr.get("pr_number"),
+            "pr_head_sha": linkage.get("pr_head_sha") or pr.get("head_sha"),
+            "ci_result": linkage.get("ci_result") or ci.get("conclusion") or (infer_ci_conclusion(ci) if ci else None),
+            "review_result": linkage.get("review_result") or reviews.get("conclusion"),
+            "bridge_gate_result": linkage.get("bridge_gate_result") or gate.get("result"),
+            "closeout_ref": linkage.get("closeout_ref"),
+            "closeout_present": bool(linkage.get("closeout_ref")) or closeout_has_task(task_id, milestone.stem),
+            "delivery_status": linkage.get("linkage_status"),
+        })
+    return {"result": "pass", "milestone": rel(milestone), "repo": repo, "dry_run": True, "items": items, "reasons": []}
+
+
+def delivery_link_payload(task: dict[str, Any], fixture: str | None, write_evidence: bool, milestone_name: str | None = None) -> dict[str, Any]:
+    raw = None
+    reasons: list[dict[str, Any]] = []
+    if fixture:
+        raw, reasons = load_json_fixture(Path(fixture), "missing_delivery_fixture")
+    if reasons:
+        return {"result": GATE_INCONCLUSIVE, "task_id": task["task_id"], "files": [], "reasons": reasons}
+    linkage = delivery_linkage_from_sources(task, raw, milestone_name)
+    logical_path = logical_evidence_path(task["task_id"], "delivery-linkage.yaml")
+    if not any_match(task.get("managed_artifact_paths", []), logical_path):
+        return {"result": "fail", "task_id": task["task_id"], "files": [], "reasons": [{"code": "outside_managed_artifact_paths", "path": logical_path, "message": "Delivery linkage evidence is outside managed_artifact_paths."}]}
+    action = "would_write"
+    if write_evidence:
+        out_dir = evidence_dir(task["task_id"])
+        out_dir.mkdir(parents=True, exist_ok=True)
+        (out_dir / "delivery-linkage.yaml").write_text(yaml.safe_dump(linkage, sort_keys=False), encoding="utf-8")
+        action = "written"
+    return {"result": linkage["conclusion"], "task_id": task["task_id"], "files": [{"path": logical_path, "action": action}], "delivery_linkage": linkage, "reasons": linkage.get("drift_reasons", [])}
+
+
+def delivery_status_payload(task: dict[str, Any]) -> dict[str, Any]:
+    data, error = read_evidence(task["task_id"], "delivery-linkage.yaml")
+    if error:
+        return {"result": GATE_INCONCLUSIVE, "task_id": task["task_id"], "delivery_status": "unlinked", "reasons": [error]}
+    status = data.get("linkage_status", GATE_INCONCLUSIVE)
+    conclusion = data.get("conclusion", GATE_INCONCLUSIVE)
+    result = "pass" if conclusion == "pass" else conclusion
+    return {"result": result, "task_id": task["task_id"], "delivery_status": status, "delivery_linkage": data, "reasons": data.get("drift_reasons", [])}
+
+
+def status_comment_body(task: dict[str, Any], linkage: dict[str, Any] | None, gate: dict[str, Any]) -> str:
+    task_id = task["task_id"]
+    issue_ref = f"Refs #{linkage.get('issue_number')}" if linkage and linkage.get("issue_number") else "Refs: none"
+    lines = [
+        f"<!-- agent-bridge:status-comment:start {task_id} -->",
+        f"Task: {task_id}",
+        "Canonical task source: repository milestone docs.",
+        issue_ref,
+        f"Bridge gate: {gate.get('result')}",
+        f"Delivery status: {(linkage or {}).get('linkage_status', 'unlinked')}",
+        f"PR: {(linkage or {}).get('pr_url') or 'none'}",
+        f"CI/checks: {(linkage or {}).get('ci_result') or 'unknown'}",
+        f"Review: {(linkage or {}).get('review_result') or 'unknown'}",
+        f"Closeout: {(linkage or {}).get('closeout_ref') or 'none'}",
+        f"<!-- agent-bridge:status-comment:end {task_id} -->",
+    ]
+    return "\n".join(lines)
+
+
+def publish_status_payload(task: dict[str, Any], repo: str | None, issue: str | None, pr: str | None, target_surface: str, write: bool, write_evidence: bool, fixture: str | None = None) -> dict[str, Any]:
+    raw = None
+    reasons: list[dict[str, Any]] = []
+    if fixture:
+        raw, reasons = load_json_fixture(Path(fixture), "missing_publication_fixture")
+    if reasons:
+        return {"result": GATE_INCONCLUSIVE, "task_id": task["task_id"], "reasons": reasons, "files": []}
+    publication = raw.get("acceptance_publication", {}) if isinstance(raw, dict) and isinstance(raw.get("acceptance_publication"), dict) else {}
+    linkage, _ = read_evidence(task["task_id"], "delivery-linkage.yaml")
+    linkage = linkage or {}
+    if issue and not linkage.get("issue_number"):
+        linkage["issue_number"] = issue
+    if pr and not linkage.get("pr_number"):
+        linkage["pr_number"] = pr
+    gate = gate_payload(task)
+    duplicate_count = publication.get("managed_comment_count", 1)
+    result = "pass"
+    if duplicate_count and int(duplicate_count) > 1:
+        result = GATE_INCONCLUSIVE
+        reasons.append({"code": "duplicate_managed_status_comments", "message": "Multiple managed status comments were found."})
+    if write and not shutil.which("gh"):
+        result = GATE_INCONCLUSIVE
+        reasons.append({"code": "gh_cli_unavailable", "message": "gh CLI is not available."})
+    body = status_comment_body(task, linkage, gate)
+    if re.search(r"\b(closes|fixes|resolves)\b", body, flags=re.IGNORECASE):
+        result = "fail"
+        reasons.append({"code": "closing_keyword_forbidden", "message": "Managed status comment contains a closing keyword."})
+    evidence = {
+        "schema_version": 1,
+        "task_id": task["task_id"],
+        "repository": repo or publication.get("repository") or linkage.get("repository"),
+        "issue_number": issue or publication.get("issue_number") or linkage.get("issue_number"),
+        "pr_number": pr or publication.get("pr_number") or linkage.get("pr_number"),
+        "target_surface": target_surface,
+        "mode": "live_write" if write else ("offline_fixture" if fixture else "dry_run"),
+        "managed_comment_found": bool(publication.get("managed_comment_found", False)),
+        "managed_comment_url": publication.get("managed_comment_url"),
+        "comment_body_summary": body,
+        "labels_planned_or_applied": publication.get("labels_planned_or_applied", []),
+        "remote_write_performed": False,
+        "generated_at": utc_now(),
+        "conclusion": result,
+    }
+    files = []
+    if write_evidence:
+        for filename, content in {
+            "acceptance-publication.yaml": evidence,
+            "github-status-comment.yaml": {"schema_version": 1, "task_id": task["task_id"], "source": "github_status_comment", "comment_body_summary": body, "duplicate_count": duplicate_count, "conclusion": result, "generated_at": utc_now()},
+        }.items():
+            logical_path = logical_evidence_path(task["task_id"], filename)
+            if not any_match(task.get("managed_artifact_paths", []), logical_path):
+                result = "fail"
+                reasons.append({"code": "outside_managed_artifact_paths", "path": logical_path, "message": "Publication evidence is outside managed_artifact_paths."})
+                continue
+            out_dir = evidence_dir(task["task_id"])
+            out_dir.mkdir(parents=True, exist_ok=True)
+            (out_dir / filename).write_text(yaml.safe_dump(content, sort_keys=False), encoding="utf-8")
+            files.append({"path": logical_path, "action": "written"})
+    return {"result": result, "task_id": task["task_id"], "dry_run": not write, "comment_body": body, "publication": evidence, "files": files, "reasons": reasons}
+
+
+def required_delivery_evidence(task: dict[str, Any]) -> list[str]:
+    value = task.get("required_delivery_evidence")
+    if isinstance(value, list):
+        return [str(item) for item in value]
+    delivery = task.get("delivery_evidence")
+    if isinstance(delivery, dict) and isinstance(delivery.get("required"), list):
+        return [str(item) for item in delivery["required"]]
+    return []
+
+
+def check_delivery_evidence(task: dict[str, Any]) -> tuple[str, list[dict[str, Any]]]:
+    required = required_delivery_evidence(task)
+    if not required:
+        return "pass", []
+    result = "pass"
+    reasons: list[dict[str, Any]] = []
+    for item in required:
+        filename = DELIVERY_EVIDENCE_FILES.get(item)
+        if not filename:
+            result = GATE_INCONCLUSIVE
+            reasons.append({"code": "unknown_required_delivery_evidence", "message": f"Unknown delivery evidence requirement: {item}"})
+            continue
+        data, error = read_evidence(task["task_id"], filename)
+        if error:
+            result = GATE_INCONCLUSIVE
+            reasons.append({"code": f"missing_delivery_{item}_evidence", "message": f"{filename} is required.", "path": rel(evidence_dir(task["task_id"]) / filename)})
+            continue
+        conclusion = data.get("conclusion")
+        if item == "linkage":
+            for reason in data.get("drift_reasons", []) if isinstance(data.get("drift_reasons"), list) else []:
+                if isinstance(reason, dict):
+                    reasons.append(reason)
+            if conclusion in {"fail", "failed"}:
+                result = GATE_FAILED
+            elif conclusion == GATE_INCONCLUSIVE and result != GATE_FAILED:
+                result = GATE_INCONCLUSIVE
+        elif item in {"publication", "status_comment"}:
+            if item == "publication" and data.get("remote_write_performed") not in {True, False}:
+                reasons.append({"code": "invalid_publication_remote_write_flag", "message": "Publication evidence must record remote_write_performed."})
+                if result != GATE_FAILED:
+                    result = GATE_INCONCLUSIVE
+            duplicate_count = data.get("duplicate_count")
+            if duplicate_count and int(duplicate_count) > 1:
+                reasons.append({"code": "duplicate_managed_status_comments", "message": "Multiple managed status comments were found."})
+                if result != GATE_FAILED:
+                    result = GATE_INCONCLUSIVE
+            if conclusion in {"fail", "failed"}:
+                result = GATE_FAILED
+            elif conclusion != "pass" and result != GATE_FAILED:
+                result = GATE_INCONCLUSIVE
+    return result, reasons
+
+
 def run_gh_json(args: list[str]) -> tuple[dict[str, Any] | list[Any] | None, dict[str, Any] | None]:
     if not shutil.which("gh"):
         return None, {"code": "gh_cli_unavailable", "message": "gh CLI is not available."}
@@ -1304,6 +1657,7 @@ def gate_payload(task: dict[str, Any]) -> dict[str, Any]:
         "blockers": check_blockers(task),
         "github_evidence": check_github_evidence(task),
         "issue_evidence": check_issue_evidence(task),
+        "delivery_evidence": check_delivery_evidence(task),
     }
     reasons: list[dict[str, Any]] = []
     result = GATE_ACCEPTED
@@ -1617,6 +1971,59 @@ def command_issue_comment(args: argparse.Namespace) -> int:
     return result_exit(payload["result"])
 
 
+def command_delivery_plan(args: argparse.Namespace) -> int:
+    milestone = resolve_milestone(args.milestone)
+    tasks, errors = load_validated_tasks(milestone)
+    if errors:
+        return emit({"result": GATE_INCONCLUSIVE, "milestone": rel(milestone), "reasons": errors}, args.json)
+    payload = delivery_plan_payload(tasks, milestone, args.repo)
+    return emit(payload, args.json)
+
+
+def command_delivery_link(args: argparse.Namespace) -> int:
+    milestone = resolve_milestone(args.milestone, args.task)
+    task, errors = find_task(args.task, milestone)
+    if errors or task is None:
+        return emit({"result": GATE_INCONCLUSIVE, "task_id": args.task, "reasons": errors}, args.json)
+    payload = delivery_link_payload(task, args.from_json, args.write_evidence, args.milestone_name or milestone.stem)
+    if args.json:
+        return emit(payload, True)
+    print(payload["result"])
+    for item in payload.get("files", []):
+        print(f"- {item['action']}: {item['path']}")
+    for reason in payload.get("reasons", []):
+        print(f"- {reason.get('code')}: {reason.get('message')}")
+    return result_exit(payload["result"])
+
+
+def command_delivery_status(args: argparse.Namespace) -> int:
+    task, errors = find_task(args.task, resolve_milestone(args.milestone, args.task))
+    if errors or task is None:
+        return emit({"result": GATE_INCONCLUSIVE, "task_id": args.task, "reasons": errors}, args.json)
+    payload = delivery_status_payload(task)
+    return emit(payload, args.json)
+
+
+def command_publish_status(args: argparse.Namespace) -> int:
+    task, errors = find_task(args.task, resolve_milestone(args.milestone, args.task))
+    if errors or task is None:
+        return emit({"result": GATE_INCONCLUSIVE, "task_id": args.task, "reasons": errors}, args.json)
+    payload = publish_status_payload(task, args.repo, args.issue, args.pr, args.target_surface, args.write, args.write_evidence, args.from_json)
+    if args.json:
+        return emit(payload, True)
+    print(payload["result"])
+    print(payload.get("comment_body", ""))
+    for item in payload.get("files", []):
+        print(f"- {item['action']}: {item['path']}")
+    for reason in payload.get("reasons", []):
+        print(f"- {reason.get('code')}: {reason.get('message')}")
+    return result_exit(payload["result"])
+
+
+def command_delivery_closeout(args: argparse.Namespace) -> int:
+    return command_closeout(args)
+
+
 def command_gate(args: argparse.Namespace) -> int:
     task, errors = find_task(args.task, resolve_milestone(args.milestone, args.task))
     if errors or task is None:
@@ -1744,6 +2151,34 @@ def summarize_issue_evidence(task_id: str) -> list[str]:
     return lines
 
 
+def summarize_delivery_evidence(task_id: str) -> list[str]:
+    lines: list[str] = []
+    linkage, _ = read_evidence(task_id, "delivery-linkage.yaml")
+    if linkage:
+        lines.append(f"- Delivery status: {linkage.get('linkage_status', 'unknown')}")
+        if linkage.get("issue_url"):
+            lines.append(f"- Delivery issue: {linkage.get('issue_url')}")
+        if linkage.get("pr_url"):
+            lines.append(f"- Delivery PR: {linkage.get('pr_url')}")
+        if linkage.get("pr_head_sha"):
+            lines.append(f"- Delivery PR head_sha: {linkage.get('pr_head_sha')}")
+        if linkage.get("ci_result"):
+            lines.append(f"- Delivery CI/checks: {linkage.get('ci_result')}")
+        if linkage.get("review_result"):
+            lines.append(f"- Delivery review: {linkage.get('review_result')}")
+        if linkage.get("bridge_gate_result"):
+            lines.append(f"- Delivery gate: {linkage.get('bridge_gate_result')}")
+    publication, _ = read_evidence(task_id, "acceptance-publication.yaml")
+    if publication:
+        lines.append(f"- Publication mode: {publication.get('mode', 'unknown')}")
+        lines.append(f"- Remote write performed: {bool(publication.get('remote_write_performed'))}")
+        lines.append(f"- Publication conclusion: {publication.get('conclusion', 'unknown')}")
+    status_comment, _ = read_evidence(task_id, "github-status-comment.yaml")
+    if status_comment:
+        lines.append(f"- Status comment conclusion: {status_comment.get('conclusion', 'unknown')}")
+    return lines
+
+
 def closeout_block(task: dict[str, Any], gate: dict[str, Any], milestone: Path = DEFAULT_MILESTONE) -> str:
     task_id = task["task_id"]
     status = gate["result"]
@@ -1754,6 +2189,7 @@ def closeout_block(task: dict[str, Any], gate: dict[str, Any], milestone: Path =
     evidence_summary = "\n".join(evidence_lines) or "- none"
     github_summary = "\n".join(summarize_github_evidence(task_id)) or "- none"
     issue_summary = "\n".join(summarize_issue_evidence(task_id)) or "- none"
+    delivery_summary = "\n".join(summarize_delivery_evidence(task_id)) or "- none"
     branch = current_branch() or "unknown"
     source_lines = "- none"
     path_policy, _ = read_evidence(task_id, "path-policy.yaml")
@@ -1811,6 +2247,10 @@ GitHub evidence:
 GitHub Issue evidence:
 
 {issue_summary}
+
+Delivery linkage evidence:
+
+{delivery_summary}
 
 Known risks:
 
@@ -1953,6 +2393,48 @@ def build_parser() -> argparse.ArgumentParser:
     issue_comment.add_argument("--write-evidence", action="store_true")
     issue_comment.add_argument("--json", action="store_true")
     issue_comment.set_defaults(func=command_issue_comment)
+
+    delivery_plan = sub.add_parser("delivery-plan")
+    delivery_plan.add_argument("--milestone", default=str(DEFAULT_MILESTONE))
+    delivery_plan.add_argument("--repo")
+    delivery_plan.add_argument("--json", action="store_true")
+    delivery_plan.set_defaults(func=command_delivery_plan)
+
+    delivery_link = sub.add_parser("delivery-link")
+    delivery_link.add_argument("--task", required=True)
+    delivery_link.add_argument("--milestone", default=str(DEFAULT_MILESTONE))
+    delivery_link.add_argument("--milestone-name")
+    delivery_link.add_argument("--from-json")
+    delivery_link.add_argument("--write-evidence", action="store_true")
+    delivery_link.add_argument("--json", action="store_true")
+    delivery_link.set_defaults(func=command_delivery_link)
+
+    delivery_status = sub.add_parser("delivery-status")
+    delivery_status.add_argument("--task", required=True)
+    delivery_status.add_argument("--milestone", default=str(DEFAULT_MILESTONE))
+    delivery_status.add_argument("--json", action="store_true")
+    delivery_status.set_defaults(func=command_delivery_status)
+
+    publish_status = sub.add_parser("publish-status")
+    publish_status.add_argument("--task", required=True)
+    publish_status.add_argument("--milestone", default=str(DEFAULT_MILESTONE))
+    publish_status.add_argument("--repo")
+    publish_status.add_argument("--issue")
+    publish_status.add_argument("--pr")
+    publish_status.add_argument("--target-surface", default="both", choices=["issue", "pr", "both"])
+    publish_status.add_argument("--from-json")
+    publish_status.add_argument("--write", action="store_true")
+    publish_status.add_argument("--write-evidence", action="store_true")
+    publish_status.add_argument("--json", action="store_true")
+    publish_status.set_defaults(func=command_publish_status)
+
+    delivery_closeout = sub.add_parser("delivery-closeout")
+    delivery_closeout.add_argument("--task")
+    delivery_closeout.add_argument("--milestone", default=str(DEFAULT_MILESTONE))
+    delivery_closeout.add_argument("--milestone-name", default="M1")
+    delivery_closeout.add_argument("--dry-run", action="store_true")
+    delivery_closeout.add_argument("--json", action="store_true")
+    delivery_closeout.set_defaults(func=command_delivery_closeout)
 
     gate = sub.add_parser("gate")
     gate.add_argument("--task", required=True)

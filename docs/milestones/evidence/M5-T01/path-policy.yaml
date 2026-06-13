@@ -1,0 +1,22 @@
+schema_version: 1
+task_id: M5-T01
+result: pass
+changed_files:
+- docs/agent/acceptance-publication.md
+- docs/agent/github-comment-boundaries.md
+- docs/agent/github-delivery-linkage.md
+- docs/milestones/M5.md
+- docs/milestones/evidence/M5-T01/gate-report.yaml
+- docs/milestones/evidence/M5-T01/path-policy.yaml
+- docs/milestones/evidence/M5-T01/reviewer.yaml
+- phase-5-development-plan.md
+reasons: []
+source:
+  mode: worktree
+  include_paths:
+  - phase-5-development-plan.md
+  - docs/milestones/M5.md
+  - docs/agent/github-delivery-linkage.md
+  - docs/agent/acceptance-publication.md
+  - docs/agent/github-comment-boundaries.md
+  - docs/milestones/evidence/M5-T01/**
